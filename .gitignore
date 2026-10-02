@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Snapshot stores, mirrors and caches (keep upstream code out of this working tree)
+.txray/
+.txray-store/
+/store/
+/snapshots/
+/mirrors/
+/cache/
+.cache/
+
+# Local analytics exports must never be committed
+/analytics-data/
+*.analytics.csv
+
+# OS and editor noise
+.DS_Store
+*.swp
+.idea/
+.vscode/

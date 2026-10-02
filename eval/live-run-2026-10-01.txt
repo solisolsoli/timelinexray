@@ -1,0 +1,50 @@
+live semantic gate: 40 / 40 items run (31 answer, 9 abstain in the set; 0 not run, 5 errors); status: root-reviewed 2026-10-01
+models: claude-haiku-4-5-20251001; cost USD 1.8026; turns 370; tokens {'input_tokens': 2104, 'cache_creation_input_tokens': 523947, 'cache_read_input_tokens': 3566803, 'output_tokens': 79193}
+  precision              27 / 30 = 0.900
+  coverage               27 / 31 = 0.871
+  coverage_of_set        27 / 31 = 0.871
+  abstention_accuracy    5 / 9 = 0.556
+  false_abstention_rate  0 / 31 = 0.000
+  citation_integrity     50 / 50 = 1.000
+  categories: correct 27, correct_abstention 5, error 5, uncited 2, unsupported_answer 1
+  Q01  run     error               USD 0.0867 turns 16  spans 0/0
+  Q02  run     error               USD 0.0991 turns 16  spans 0/0
+  Q03  run     uncited             USD 0.0676 turns 14  spans 1/1
+  Q04  run     uncited             USD 0.0502 turns 12  spans 1/1
+  Q05  run     correct             USD 0.0224 turns 6   spans 1/1
+  Q06  run     correct             USD 0.0266 turns 7   spans 2/2
+  Q07  run     correct             USD 0.0263 turns 8   spans 2/2
+  Q08  run     correct             USD 0.0227 turns 6   spans 2/2
+  Q09  run     correct             USD 0.0287 turns 7   spans 2/2
+  Q10  run     correct             USD 0.0198 turns 6   spans 2/2
+  Q11  run     correct             USD 0.0264 turns 8   spans 2/2
+  Q12  run     correct             USD 0.0174 turns 5   spans 2/2
+  Q13  run     correct             USD 0.0224 turns 5   spans 2/2
+  Q14  run     correct             USD 0.0271 turns 8   spans 2/2
+  Q15  run     correct             USD 0.0239 turns 7   spans 2/2
+  Q16  run     correct             USD 0.0377 turns 8   spans 2/2
+  Q17  run     correct             USD 0.0192 turns 6   spans 2/2
+  Q18  run     correct             USD 0.0194 turns 6   spans 2/2
+  Q19  run     correct             USD 0.0256 turns 7   spans 2/2
+  Q20  run     correct             USD 0.0124 turns 4   spans 1/1
+  Q21  run     correct             USD 0.0625 turns 13  spans 1/1
+  Q22  run     correct             USD 0.0975 turns 17  spans 2/2
+  Q23  run     correct             USD 0.0469 turns 10  spans 2/2
+  Q24  run     correct             USD 0.0135 turns 4   spans 1/1
+  Q25  run     correct             USD 0.0143 turns 4   spans 1/1
+  Q26  run     correct             USD 0.0237 turns 8   spans 1/1
+  Q27  run     correct             USD 0.0149 turns 4   spans 1/1
+  Q28  run     correct             USD 0.0200 turns 5   spans 1/1
+  Q29  run     correct             USD 0.0240 turns 4   spans 1/1
+  Q30  run     correct             USD 0.0233 turns 6   spans 1/1
+  Q31  run     correct             USD 0.0349 turns 9   spans 3/3
+  A01  run     correct_abstention  USD 0.0175 turns 5   spans 0/0
+  A02  run     unsupported_answer  USD 0.0956 turns 16  spans 3/3
+  A03  run     correct_abstention  USD 0.0343 turns 12  spans 0/0
+  A04  run     correct_abstention  USD 0.0739 turns 22  spans 0/0
+  A05  run     correct_abstention  USD 0.0128 turns 4   spans 0/0
+  A06  run     error               USD 0.1872 turns 16  spans 0/0
+  A07  run     error               USD 0.1248 turns 16  spans 0/0
+  A08  run     correct_abstention  USD 0.0437 turns 17  spans 0/0
+  A09  run     error               USD 0.1556 turns 16  spans 0/0
+gate (proposed thresholds, pending root review): FAIL {"abstention_accuracy": false, "citation_integrity": true, "coverage": true, "false_abstention_rate": true, "precision": false}

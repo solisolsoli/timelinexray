@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "timelinexray/manifest/v1",
+  "title": "TimelineXray snapshot manifest",
+  "description": "Every path of one commit's tree with its classification, blob identity and license observations. Serialised with sorted keys, one-space indent, ASCII escapes and a trailing newline; identified by the SHA-256 of those bytes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "commit", "tree", "parents", "committer_time", "object_format", "classifier", "counts", "licenses", "entries"],
+  "properties": {
+    "schema": {"const": "timelinexray/manifest/v1"},
+    "commit": {"$ref": "#/$defs/object_id"},
+    "tree": {"$ref": "#/$defs/object_id"},
+    "parents": {"type": "array", "items": {"$ref": "#/$defs/object_id"}},
+    "committer_time": {"type": "string", "description": "Committer timestamp of the commit, ISO 8601 UTC, second precision.", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+    "object_format": {"enum": ["sha1", "sha256"]},
+    "classifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "max_file_bytes", "binary_probe_bytes", "marker_probe_bytes"],
+      "properties": {
+        "version": {"type": "integer", "minimum": 1},
+        "max_file_bytes": {"type": "integer", "minimum": 0},
+        "binary_probe_bytes": {"type": "integer", "minimum": 1},
+        "marker_probe_bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "classification", "excluded_reason", "language"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "classification": {"type": "object", "additionalProperties": {"type": "integer"}},
+        "excluded_reason": {"type": "object", "additionalProperties": {"type": "integer"}},
+        "language": {"type": "object", "additionalProperties": {"type": "integer"}}
+      }
+    },
+    "licenses": {"type": "array", "items": {"$ref": "#/$defs/license"}},
+    "entries": {"type": "array", "items": {"$ref": "#/$defs/entry"}}
+  },
+  "$defs": {
+    "object_id": {"type": "string", "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "mode", "type", "oid", "size", "sha256", "classification", "reason", "rule", "language", "utf8"],
+      "properties": {
+        "path": {"type": "string", "description": "Repository-relative git path; bytes that are not UTF-8 appear as surrogate escapes."},
+        "mode": {"enum": ["100644", "100755", "120000", "160000"]},
+        "type": {"enum": ["blob", "commit"]},
+        "oid": {"$ref": "#/$defs/object_id"},
+        "size": {"type": ["integer", "null"], "minimum": 0},
+        "sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "classification": {"enum": ["parsed-candidate", "text", "excluded"]},
+        "reason": {"enum": ["binary", "generated", "oversize", "submodule", "symlink", "vendored", null]},
+        "rule": {"type": ["string", "null"], "description": "The classifier rule that excluded the path, e.g. mode:120000, dir:vendor, suffix:_pb2.py, size>1048576, marker:@generated."},
+        "language": {"type": ["string", "null"], "description": "Guessed from the file name only."},
+        "utf8": {"type": ["boolean", "null"], "description": "Whether the blob decodes as UTF-8; null for gitlinks."}
+      }
+    },
+    "license": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "oid", "sha256", "size", "classification", "hints"],
+      "properties": {
+        "path": {"type": "string"},
+        "kind": {"enum": ["license", "copying", "notice", "third-party-notices"]},
+        "oid": {"$ref": "#/$defs/object_id"},
+        "sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "size": {"type": ["integer", "null"], "minimum": 0},
+        "classification": {"enum": ["parsed-candidate", "text", "excluded"]},
+        "hints": {"type": "array", "items": {"type": "string"}, "description": "Keyword hints about licenses the file mentions; not a license determination."}
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use TimelineXray, please cite it together with the upstream commit you pinned."
+title: "TimelineXray"
+abstract: >-
+  Evidence-first research tool for the public xai-org/x-algorithm repository:
+  commit-pinned snapshots, exact source spans with SHA-256 hashes, a native code index,
+  a hash-chained findings ledger that marks changed evidence STALE, change digests and a
+  read-only MCP server. Independent community analysis of publicly available source code.
+  Not affiliated with or endorsed by X or xAI.
+type: software
+authors:
+  - alias: "solisolsoli"
+version: "0.10.0"
+date-released: "2026-10-02"
+license: Apache-2.0
+repository-code: "https://github.com/solisolsoli/timelinexray"
+keywords:
+  - x-algorithm
+  - recommender systems
+  - provenance
+  - model context protocol
+  - code search

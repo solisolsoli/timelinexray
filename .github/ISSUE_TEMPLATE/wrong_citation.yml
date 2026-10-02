@@ -1,0 +1,38 @@
+name: Wrong or stale citation
+description: A span, anchor, parameter value or finding does not match the upstream code
+title: "[citation] "
+labels:
+  - evidence
+body:
+  - type: markdown
+    attributes:
+      value: "Values in the code are public defaults at a commit, not production values; reports about production behaviour cannot be verified from the public code."
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: "Full or short SHA of the pinned upstream commit."
+    validations:
+      required: true
+  - type: input
+    id: path
+    attributes:
+      label: Path and lines
+      placeholder: "path/to/file.rs, lines 10-20"
+    validations:
+      required: true
+  - type: textarea
+    id: shown
+    attributes:
+      label: What TimelineXray shows
+      description: "Paste the output of txray show ... --json or txray param ..."
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: What the code at that commit says
+      description: "A GitHub permalink at the same commit."
+    validations:
+      required: true

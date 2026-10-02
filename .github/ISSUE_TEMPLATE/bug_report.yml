@@ -1,0 +1,46 @@
+name: Bug report
+description: Something in TimelineXray behaves differently from its documentation
+title: "[bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: "Do not paste private analytics data or tokens. Security problems: use private vulnerability reporting (see SECURITY.md), not an issue."
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: "Link the documentation or the test that says so, if you can."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: "The exact command(s), with the pinned commit."
+      placeholder: "txray --version"
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: txray version
+      description: "Output of txray --version."
+      placeholder: "txray 0.10.0"
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: "OS, Python version (python3 --version), git version (git --version), and the output of python scripts/check_sqlite.py if the code index is involved."
+    validations:
+      required: true

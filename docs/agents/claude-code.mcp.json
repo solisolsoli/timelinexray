@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "timelinexray": {
+      "type": "stdio",
+      "command": "txray",
+      "args": ["mcp", "serve", "--store", "/path/to/timelinexray-store"]
+    }
+  }
+}

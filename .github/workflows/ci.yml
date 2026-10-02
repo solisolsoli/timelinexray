@@ -1,0 +1,61 @@
+# Continuous integration for TimelineXray: `make ci` on Linux and macOS for every declared
+# Python version, with a local clone of the upstream at the pinned commit so that no test is
+# skipped. A preflight checks first, in seconds, that the runner's Python has SQLite FTS5
+# with the trigram tokenizer, which the code index needs, and prints the Python, SQLite and
+# git versions. The clone takes a few seconds and always runs (no cache: a shared cache key
+# raced between jobs, and a cache hit would skip the integrity checks of the fetch script).
+# A weekly scheduled run catches drift of the runner image, Python, SQLite or git.
+#
+# Written in the strict block-style YAML subset of timelinexray.findings.yamlsub, so that
+# scripts/check_workflows.py reads it with the project's own reader. Every third-party
+# action is pinned to a full commit SHA; the comment names the release tag (and the major
+# tag pointing to the same commit) resolved with
+# `git ls-remote https://github.com/actions/<name>` on 2026-10-01.
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: make ci (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+        python:
+          - "3.11"
+          - "3.12"
+          - "3.13"
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1 (= v7)
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0 (= v7)
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Check SQLite FTS5 with the trigram tokenizer
+        run: python scripts/check_sqlite.py
+      - name: Clone the upstream at the pinned commit
+        run: python scripts/fetch_test_upstream.py "$RUNNER_TEMP/x-algorithm-upstream"
+      - name: Run make ci
+        env:
+          TXRAY_TEST_UPSTREAM: ${{ runner.temp }}/x-algorithm-upstream
+        run: make ci

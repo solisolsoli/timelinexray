@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "timelinexray/research-import/v1",
+  "title": "TimelineXray research-import file",
+  "description": "Findings as delivered by research reports, read by `txray findings import`. The same data may be written as JSON, as YAML (the strict block-style subset documented in docs/findings-memory.md) or as one fenced `findings:` block inside Markdown. Imported findings keep the report's own status (basis `reported`) and enter workflow `imported`; nothing is promoted. timelinexray.findings.research.validate implements these rules and the test suite checks that both agree.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["findings"],
+  "properties": {
+    "findings": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/finding"}}
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "claim", "component", "evidence_class", "status", "sources", "creator_relevance", "creator_controllable", "implication", "volatility", "misuse_risk", "note"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", "description": "Report-local id; imported as <source-label>:<id>. Unique within the file."},
+        "title": {"type": "string", "minLength": 1, "maxLength": 300},
+        "claim": {"type": "string", "minLength": 1, "maxLength": 4000, "description": "One falsifiable sentence."},
+        "component": {"type": "string", "minLength": 1, "maxLength": 200, "description": "Top-level upstream directory, or 'external'."},
+        "evidence_class": {"enum": ["CODE", "PARAM_DEFAULT", "REPO_DOC", "OFFICIAL", "THIRD_PARTY", "EMPIRICAL", "INFERENCE"]},
+        "status": {"enum": ["SUPPORTED", "PARTIAL", "NOT_FOUND", "CONTRADICTED", "EXTERNAL_RECHECK"], "description": "The report's own status; kept with basis 'reported'."},
+        "sources": {"type": "array", "items": {"oneOf": [{"$ref": "#/$defs/code_source"}, {"$ref": "#/$defs/web_source"}]}},
+        "creator_relevance": {"enum": ["none", "low", "medium", "high"]},
+        "creator_controllable": {"enum": ["yes", "partly", "no"]},
+        "implication": {"type": "string", "maxLength": 4000},
+        "volatility": {"enum": ["stable", "param", "experiment", "unknown"]},
+        "misuse_risk": {"enum": ["low", "medium", "high"]},
+        "note": {"type": "string", "maxLength": 4000}
+      }
+    },
+    "code_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "lines", "commit", "anchor"],
+      "properties": {
+        "kind": {"const": "code"},
+        "path": {"type": "string", "minLength": 1, "description": "Repository-relative path: no leading '/', no empty, '.' or '..' segments, no NUL."},
+        "lines": {"type": "string", "pattern": "^[1-9][0-9]*(-[1-9][0-9]*)?$", "description": "1-based inclusive line range 'A-B', or 'A'."},
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{7,40}$", "description": "Commit the lines refer to; resolved against pinned commits of the snapshot store."},
+        "anchor": {"type": "string", "minLength": 1, "maxLength": 1000, "description": "Exact text expected to occur inside the cited lines (once, or several times: FOUND_MULTIPLE)."}
+      }
+    },
+    "web_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "url", "publisher", "published", "retrieved", "quote"],
+      "properties": {
+        "kind": {"const": "web"},
+        "url": {"type": "string", "pattern": "^https?://[^\\s]+$", "description": "Recorded, never fetched by TimelineXray."},
+        "publisher": {"type": "string"},
+        "published": {"oneOf": [{"type": "string", "pattern": "^[0-9]{4}(-[0-9]{2}(-[0-9]{2})?)?$"}, {"type": "null"}], "description": "Publication date with its own precision; null when unknown (never invented)."},
+        "retrieved": {"type": "string", "pattern": "^[0-9]{4}(-[0-9]{2}(-[0-9]{2})?)?$"},
+        "quote": {"type": "string"}
+      }
+    }
+  }
+}

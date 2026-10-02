@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "timelinexray"
+version = "0.10.0"
+description = "Evidence-first research tool for the public xai-org/x-algorithm repository: commit-pinned snapshots, manifests and exact source spans."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "solisolsoli" }]
+dependencies = []
+keywords = ["x-algorithm", "twitter-algorithm", "recommender-system", "provenance", "mcp", "model-context-protocol", "code-search", "evidence", "git", "research"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Private :: Do Not Upload",
+]
+
+[project.urls]
+Homepage = "https://github.com/solisolsoli/timelinexray"
+Documentation = "https://github.com/solisolsoli/timelinexray/tree/main/docs"
+Issues = "https://github.com/solisolsoli/timelinexray/issues"
+Changelog = "https://github.com/solisolsoli/timelinexray/blob/main/CHANGELOG.md"
+Source = "https://github.com/solisolsoli/timelinexray"
+Security = "https://github.com/solisolsoli/timelinexray/security/policy"
+
+[project.scripts]
+txray = "timelinexray.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

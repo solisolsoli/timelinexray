@@ -1,0 +1,122 @@
+# SYNTHETIC research-import example for TimelineXray.
+#
+# Every finding below is invented for testing. The code sources point at the synthetic
+# fixture repository of the test suite (tests/support.py, commit 3879192e...), not at any
+# real upstream code, and the web sources use reserved example domains. Import it with:
+#
+#   txray findings import schemas/research-import.example.yaml --source-label EXAMPLE --actor importer
+#
+# The format is described by schemas/research-import.schema.json.
+findings:
+- id: EX-001
+  title: Synthetic click constant
+  claim: The synthetic library declares a click constant with the public default 0.3
+    on its first line.
+  component: src
+  evidence_class: PARAM_DEFAULT
+  status: SUPPORTED
+  sources:
+  - kind: code
+    path: src/lib.rs
+    lines: 1-1
+    commit: 3879192e944aed5a4e98d662ceee2a497b6e02a4
+    anchor: 'pub const CLICK: f64'
+  creator_relevance: low
+  creator_controllable: 'no'
+  implication: Synthetic example only; it says nothing about any real system.
+  volatility: param
+  misuse_risk: low
+  note: Example of a code source whose anchor occurs exactly once in the cited line.
+- id: EX-002
+  title: Duplicated weight assignment
+  claim: The synthetic module assigns the same weight twice in a row.
+  component: src
+  evidence_class: CODE
+  status: PARTIAL
+  sources:
+  - kind: code
+    path: src/app.py
+    lines: 1-2
+    commit: 3879192e944aed5a4e98d662ceee2a497b6e02a4
+    anchor: WEIGHT = 0.5
+  creator_relevance: none
+  creator_controllable: 'no'
+  implication: Synthetic example only.
+  volatility: stable
+  misuse_risk: low
+  note: The anchor occurs twice inside the span, so the verifier reports it FOUND_MULTIPLE.
+- id: EX-003
+  title: Fixture readme describes itself
+  claim: "The fixture readme calls the repository synthetic."
+  component: docs
+  evidence_class: REPO_DOC
+  status: SUPPORTED
+  sources:
+  - kind: code
+    path: README.md
+    lines: '3'
+    commit: 3879192e944aed5a4e98d662ceee2a497b6e02a4
+    anchor: Synthetic repository
+  creator_relevance: none
+  creator_controllable: 'no'
+  implication: ''
+  volatility: stable
+  misuse_risk: low
+  note: 'A single-line source written as "3"; quotes such as ''this'' are escaped.'
+- id: EX-004
+  title: Anchor outside the cited lines
+  claim: The synthetic library defines a function after its constant.
+  component: src
+  evidence_class: CODE
+  status: SUPPORTED
+  sources:
+  - kind: code
+    path: src/lib.rs
+    lines: 1-1
+    commit: 3879192e944aed5a4e98d662ceee2a497b6e02a4
+    anchor: pub fn f
+  creator_relevance: none
+  creator_controllable: 'no'
+  implication: Synthetic example only.
+  volatility: stable
+  misuse_risk: low
+  note: The anchor is on line 2, outside the cited line, so the verifier reports it MISSING.
+- id: EX-005
+  title: Unopened external statement
+  claim: A synthetic operator statement exists but could not be opened when this example was
+    written.
+  component: external
+  evidence_class: OFFICIAL
+  status: EXTERNAL_RECHECK
+  sources:
+  - kind: web
+    url: https://example.com/statements/synthetic
+    publisher: Example Publisher
+    published: null
+    retrieved: '2026-01-01'
+    quote: ''
+  creator_relevance: medium
+  creator_controllable: partly
+  implication: Nothing follows until the statement is read.
+  volatility: unknown
+  misuse_risk: medium
+  note: The publication date is unknown and stays null; it is never invented.
+- id: EX-006
+  title: Month-precision third-party note
+  claim: "A synthetic third-party article discusses the fixture.\nIt is an example only."
+  component: external
+  evidence_class: THIRD_PARTY
+  status: PARTIAL
+  sources:
+  - kind: web
+    url: https://example.org/articles/fixture
+    publisher: Example Org
+    published: 2026-02
+    retrieved: '2026-03-01'
+    quote: A fixture is a fixture.
+  creator_relevance: low
+  creator_controllable: 'yes'
+  implication: Third-party text is not code evidence.
+  volatility: unknown
+  misuse_risk: low
+  note: Its date has month precision only.

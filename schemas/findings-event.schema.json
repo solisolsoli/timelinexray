@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "timelinexray/findings-event/v1",
+  "title": "TimelineXray findings event",
+  "description": "One line of a findings ledger's events.jsonl: canonical JSON (sorted keys, no whitespace, ASCII escapes) followed by LF. `hash` is the SHA-256 of the canonical JSON of the event without `hash`; `prev` is the previous event's hash (64 zeros for the first event); `seq` counts from 1. The ledger's HEAD file holds {hash, seq} of the last event. See docs/findings-memory.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "seq", "type", "time", "actor", "finding_id", "payload", "prev", "hash"],
+  "properties": {
+    "schema": {"const": "timelinexray/findings-event/v1"},
+    "seq": {"type": "integer", "minimum": 1},
+    "type": {"enum": ["create", "verify", "review", "supersede", "retract", "import"]},
+    "time": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$", "description": "UTC time the action was recorded."},
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "role"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._@+-]{0,63}$", "description": "Declared (not authenticated) actor name: a role or handle, never a personal name."},
+        "role": {"enum": ["author", "importer", "reviewer", "maintainer", "verifier"]}
+      }
+    },
+    "finding_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "payload": {
+      "type": "object",
+      "description": "create/import: {record}; verify: {mode (integrity|reanchor), target, freshness, verdict, reasons, citations, dependencies, negative, provenance, triggers, verifier, tool_version, current_citations?}; review: {status, rationale, objections, previous_status, previous_basis, integrity_event}; supersede: {by, record|null, rationale}; retract: {reason}."
+    },
+    "prev": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

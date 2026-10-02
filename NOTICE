@@ -1,0 +1,32 @@
+TimelineXray
+Copyright 2026 solisolsoli
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+SPDX-License-Identifier: Apache-2.0
+
+Independent community analysis of publicly available source code. Not affiliated with or endorsed by X or xAI.
+
+Upstream source code
+--------------------
+TimelineXray does not include or redistribute source code from the xai-org/x-algorithm
+repository: it is not vendored. That code is fetched at runtime from the public repository
+into a local snapshot store and remains under its own license and notices. At commit
+77d431aabf409ca1c1eed9bec7e2183f7c914e23 its root LICENSE file is the Apache License 2.0,
+and it contains component-level NOTICE files (for example one for MIT-licensed code in
+abuse-ledger-service) that TimelineXray's license inventory lists for every pinned commit.
+Keep those notices with any upstream material you redistribute.
+
+The goldens (goldens/citations.json) and the documentation cite upstream code by commit,
+path, line numbers, SHA-256 and short anchor strings (at most 80 characters); they contain
+no upstream source files.
+
+Names and marks
+---------------
+"X" and "xAI" are used only to identify the public repository this tool analyses. This
+project uses no X or xAI logos or other brand assets and claims no affiliation.
+
+Third-party software
+--------------------
+TimelineXray has no third-party runtime dependencies. It uses the Python standard library
+and runs the system git executable as a separate program; neither is bundled. Building a
+distribution uses setuptools (MIT License), which is not included in the built packages.

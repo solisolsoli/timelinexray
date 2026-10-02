@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "timelinexray/cli-envelope/v1",
+  "title": "TimelineXray command-line JSON envelope",
+  "description": "The one object every `txray ... --json` invocation prints, whatever happens: a result (outcome ok; attention or failed for commands that report a result and exit 1) with data and warnings, or an error (outcome error, exit code 1, 2, 3 or 130) with error.code and error.message, data null and warnings empty. Usage errors (code usage, exit 2) and unexpected exceptions (code internal_error, exit 1; the traceback goes to stderr) use the same error form. Keys are sorted and the output is ASCII. The one exception is `txray mcp tools --json`, which prints the MCP tools/list definitions themselves.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool", "version", "command", "outcome", "data", "warnings"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "tool": {"const": "timelinexray"},
+    "version": {"type": "string", "description": "The txray version that produced the envelope."},
+    "command": {"type": ["string", "null"], "description": "The command as named on the command line (`show`, `findings add`, `metrics import`); null only for a usage error before a command was identified."},
+    "outcome": {"enum": ["ok", "attention", "failed", "error"]},
+    "data": {"description": "The command's result (an object; its members are documented per command), or null on an error."},
+    "warnings": {"type": "array", "items": {"type": "string"}, "description": "Human-readable warnings; empty on an error."},
+    "error": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/error"}], "description": "Present and an object only when outcome is error."},
+    "note": {"type": ["string", "null"], "description": "The public-default footer of commands that show numbers from upstream code (boundary 5)."}
+  },
+  "anyOf": [
+    {
+      "properties": {
+        "outcome": {"enum": ["ok", "attention", "failed"]},
+        "error": {"type": "null"}
+      }
+    },
+    {
+      "required": ["error"],
+      "properties": {
+        "outcome": {"const": "error"},
+        "data": {"type": "null"},
+        "warnings": {"maxItems": 0},
+        "error": {"$ref": "#/$defs/error"}
+      }
+    }
+  ],
+  "$defs": {
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "A stable machine-readable code: the exception's code (error, invalid_input, network_refused, git_error, not_found, refused, integrity_error, span_range, plus the analytics and MCP codes offline_violation, write_refused, export_rejected, dataset_error and time_budget_exceeded), os_error, usage, interrupted or internal_error."},
+        "message": {"type": "string", "description": "One human-readable sentence; untrusted upstream text is escaped."}
+      }
+    }
+  }
+}

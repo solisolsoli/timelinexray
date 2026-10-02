@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "timelinexray": {
+      "type": "stdio",
+      "command": "python3",
+      "args": ["-m", "timelinexray", "mcp", "serve", "--store", "/path/to/timelinexray-store"],
+      "env": {"PYTHONPATH": "/path/to/timelinexray/src"}
+    }
+  }
+}

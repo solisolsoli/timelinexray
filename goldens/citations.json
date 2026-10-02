@@ -1,0 +1,639 @@
+{
+  "schema": "timelinexray/goldens/v1",
+  "upstream": "https://github.com/xai-org/x-algorithm.git",
+  "description": "Reference citations for the verifier: commit, path, 1-based inclusive line range, anchor, the SHA-256 of the exact span bytes and the expected verdicts. History entries also give the expected re-anchoring outcome and freshness at later commits. Citations only: no claims.",
+  "goldens": [
+    {
+      "id": "G01",
+      "source": "P1-013",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs",
+      "start_line": 322,
+      "end_line": 330,
+      "anchor": "let sources:",
+      "span_sha256": "3cf0a5c059666a047f55d0724fb0dd9ddd870a9f95b7e81aa5c7da3b127e8683",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G02",
+      "source": "P1-015",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs",
+      "start_line": 358,
+      "end_line": 387,
+      "anchor": "Box::new(FavHoldoutFilter)",
+      "span_sha256": "252c1d8a5b2453b5562d4dae76b16fbacfbd0a041286180dfe7870663bafbde9",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G03",
+      "source": "P1-016",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs",
+      "start_line": 418,
+      "end_line": 419,
+      "anchor": "vec![phoenix_scorer, vm_ranker]",
+      "span_sha256": "d4978a61db6309208857ef8ce327bb444d52e4bd2afef042423802243b04f372",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G04",
+      "source": "P1-018",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs",
+      "start_line": 443,
+      "end_line": 447,
+      "anchor": "DedupConversationFilter",
+      "span_sha256": "897e03c4b355f4205c721881202d685aff56406410f6721f2cb6c6d81f0a1a43",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G05",
+      "source": "P1-028",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/sources/phoenix_source.rs",
+      "start_line": 98,
+      "end_line": 102,
+      "anchor": "has_cached_posts",
+      "span_sha256": "1ac90b70c67abe24d3040ed41a3149a0248071ae162f70ae27acaff0de45bcdd",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G06",
+      "source": "P1-028",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/sources/phoenix_source.rs",
+      "start_line": 1,
+      "end_line": 65,
+      "anchor": "has_cached_posts",
+      "span_sha256": "820febe4d67b8e846bddacbfa9c456987283c79f07ba15087b0c909b503cf898",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "MISSING"
+      }
+    },
+    {
+      "id": "G07",
+      "source": "P2-011",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/params/param.rs",
+      "start_line": 302,
+      "end_line": 302,
+      "anchor": "FavoriteWeight",
+      "span_sha256": "99d404d4f6dc51a86573d9802952c43c8f8c0af84bb598c726d9beac02018207",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G08",
+      "source": "P2-012",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/params/param.rs",
+      "start_line": 303,
+      "end_line": 303,
+      "anchor": "ReplyWeight",
+      "span_sha256": "49b02ed52c89f9e16329ceb6ce5cd0859e58b578617f47a04d56ceafd2529844",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G09",
+      "source": "P2-016",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/params/param.rs",
+      "start_line": 329,
+      "end_line": 329,
+      "anchor": "ClickWeight",
+      "span_sha256": "4b5c535dbf7b2b6ac766b2405034e203e934bee70377b44d0899c8923b2fe28c",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G10",
+      "source": "P2-016",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "vm-ranker/params.rs",
+      "start_line": 18,
+      "end_line": 18,
+      "anchor": "ClickWeight",
+      "span_sha256": "4b5c535dbf7b2b6ac766b2405034e203e934bee70377b44d0899c8923b2fe28c",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G11",
+      "source": "P2-023",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/params/param.rs",
+      "start_line": 351,
+      "end_line": 351,
+      "anchor": "DwellWeight",
+      "span_sha256": "ee92def6f4e3a36ef6d4b0688767e89498fca6f191913d85ccdbbdd80a45258d",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G12",
+      "source": "P2-029",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/params/param.rs",
+      "start_line": 365,
+      "end_line": 370,
+      "anchor": "FollowAuthorWeight",
+      "span_sha256": "7ef4c67270544f4fe1ee14d0135ba60e94b0a51082382d8f1c16312f330b47e2",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G13",
+      "source": "P2-033",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/params/param.rs",
+      "start_line": 408,
+      "end_line": 408,
+      "anchor": "ReportWeight",
+      "span_sha256": "73b53423cd86f366f604328a7ca3e70d73ce26817b8e263f68f31534075410a3",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G14",
+      "source": "P2-034",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/params/param.rs",
+      "start_line": 409,
+      "end_line": 414,
+      "anchor": "NotDwelledWeight",
+      "span_sha256": "2f7131eb495f21da5303df84acd2d23e11a3a0acba67c3038f4cb2d3cdbe2476",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G15",
+      "source": "P2-095",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "xai-value-model/weights.rs",
+      "start_line": 45,
+      "end_line": 76,
+      "anchor": "self.positive_sum() + self.negative_sum()",
+      "span_sha256": "6f0abe9a0f8856091d419256969621db0d5b7794dae4863cb17cb169e6460078",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G16",
+      "source": "P3-035",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "under-the-hood/scalding/UthDailyPostsJob.scala",
+      "start_line": 199,
+      "end_line": 199,
+      "anchor": "t.shareSourceTweetId.isEmpty",
+      "span_sha256": "f262a9855bfe458441f54ffc8f7bd0aa2b985bd702fb5535c6491395e67b72b0",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G17",
+      "source": "P3-035",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "under-the-hood/scalding/UthDailyPostsJob.scala",
+      "start_line": 226,
+      "end_line": 226,
+      "anchor": "!tweet.nullcast",
+      "span_sha256": "f3466d950e54b014eab6c7213c81f504ab904877069d1fd4f08bde1b911a5090",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G18",
+      "source": "P3-037",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "under-the-hood/scalding/UthDailyPostsJob.scala",
+      "start_line": 200,
+      "end_line": 200,
+      "anchor": "initialTweetId.getOrElse",
+      "span_sha256": "768bd3808bacf4ab9e82b66424c79e60d67c6ffd7f2f40664fe30f89571a151e",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G19",
+      "source": "P3-038",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "under-the-hood/scalding/UthDailyAccountLabelsJob.scala",
+      "start_line": 33,
+      "end_line": 52,
+      "anchor": "val targetDays",
+      "span_sha256": "44014036c89a8f541b36e4496644ca90fb813b67980e2e4464ec0ef646e86422",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G20",
+      "source": "P3-035",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "under-the-hood/scalding/UthDailyPostsJob.scala",
+      "start_line": 1,
+      "end_line": 240,
+      "anchor": "UthDailyPostsJob",
+      "span_sha256": "d7e253b8236b037fcc5a47cc903c3ae228111f7f7746b43f735af63a0fd06335",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "MISSING"
+      }
+    },
+    {
+      "id": "G21",
+      "source": "P1b-006",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/query_hydrators/cached_posts_query_hydrator.rs",
+      "start_line": 11,
+      "end_line": 11,
+      "anchor": "MIN_CACHED_POSTS_THRESHOLD",
+      "span_sha256": "65fe961e95f2bb95a686ebdb3947af97936ff6b6c4833f2cdea56027a0f03f34",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G22",
+      "source": "P1b-007",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/params/param.rs",
+      "start_line": 23,
+      "end_line": 28,
+      "anchor": "ThunderMaxResults",
+      "span_sha256": "021a2db35e0d548e7103280894d96072af6353a848e19462ffd39a5a6fe0e0ab",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G23",
+      "source": "P1b-008",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "thunder/config.rs",
+      "start_line": 5,
+      "end_line": 6,
+      "anchor": "MAX_REPLY_POSTS_PER_AUTHOR",
+      "span_sha256": "e16918144b86b927b78ae97b1ccc416f3f82e3bfa0070a485cd9dcc069943ebe",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G24",
+      "source": "P1b-010",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/params/param.rs",
+      "start_line": 4,
+      "end_line": 9,
+      "anchor": "PhoenixMaxResults",
+      "span_sha256": "4f55130e09046789f7567d8d409700f3002c8298c13ef133776a079dc50b0ed1",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G25",
+      "source": "P1b-012",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/sources/simclusters_source.rs",
+      "start_line": 25,
+      "end_line": 25,
+      "anchor": "MAX_RESULTS",
+      "span_sha256": "7c67b2f0517a940d20966abb171a31ffda9fa68e46fa71e9a2fe81197e58c629",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G26",
+      "source": "P1b-024",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/util/phoenix_request.rs",
+      "start_line": 15,
+      "end_line": 15,
+      "anchor": "PHOENIX_CLIENT_MAX_CANDIDATES",
+      "span_sha256": "c2324a9c69c138523c2478f7eb41f9ea942afb2169176e044e59411e9b371267",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "G27",
+      "source": "P1b-032",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "path": "home-mixer/params/config.rs",
+      "start_line": 17,
+      "end_line": 18,
+      "anchor": "TOP_K_CANDIDATES_TO_SELECT",
+      "span_sha256": "35fb0b6f7705161cfd19f30357e9a2647cf5f48cf62a23b127480e9242050e41",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      }
+    },
+    {
+      "id": "H01",
+      "source": "P4-006",
+      "commit": "4c5cfe8f07f1c76d4f04277e803f20e6039f5191",
+      "path": "home-mixer/params/param.rs",
+      "start_line": 322,
+      "end_line": 322,
+      "anchor": "ClickWeight",
+      "span_sha256": "b01734cae3e1124eb6a960d8e84b2a8d8d7df35bc2c009bb6f9880e29e16b16a",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      },
+      "history": [
+        {
+          "target": "a707cc27ba36d3fa79450c9cffcc48a82d080b02",
+          "freshness": "STALE",
+          "outcome": "changed",
+          "proposed_lines": [
+            329,
+            329
+          ]
+        },
+        {
+          "target": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+          "freshness": "STALE",
+          "outcome": "changed",
+          "proposed_lines": [
+            329,
+            329
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H02",
+      "source": "P4-006",
+      "commit": "4c5cfe8f07f1c76d4f04277e803f20e6039f5191",
+      "path": "vm-ranker/params.rs",
+      "start_line": 18,
+      "end_line": 18,
+      "anchor": "ClickWeight",
+      "span_sha256": "b01734cae3e1124eb6a960d8e84b2a8d8d7df35bc2c009bb6f9880e29e16b16a",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      },
+      "history": [
+        {
+          "target": "a707cc27ba36d3fa79450c9cffcc48a82d080b02",
+          "freshness": "STALE",
+          "outcome": "changed",
+          "proposed_lines": [
+            18,
+            18
+          ]
+        },
+        {
+          "target": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+          "freshness": "STALE",
+          "outcome": "changed",
+          "proposed_lines": [
+            18,
+            18
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H03",
+      "source": "P2-011",
+      "commit": "4c5cfe8f07f1c76d4f04277e803f20e6039f5191",
+      "path": "home-mixer/params/param.rs",
+      "start_line": 295,
+      "end_line": 295,
+      "anchor": "FavoriteWeight",
+      "span_sha256": "99d404d4f6dc51a86573d9802952c43c8f8c0af84bb598c726d9beac02018207",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      },
+      "history": [
+        {
+          "target": "a707cc27ba36d3fa79450c9cffcc48a82d080b02",
+          "freshness": "CURRENT",
+          "outcome": "relocated",
+          "lines": [
+            302,
+            302
+          ]
+        },
+        {
+          "target": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+          "freshness": "CURRENT",
+          "outcome": "relocated",
+          "lines": [
+            302,
+            302
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H04",
+      "source": "P2-011",
+      "commit": "4c5cfe8f07f1c76d4f04277e803f20e6039f5191",
+      "path": "vm-ranker/params.rs",
+      "start_line": 3,
+      "end_line": 3,
+      "anchor": "FavoriteWeight",
+      "span_sha256": "99d404d4f6dc51a86573d9802952c43c8f8c0af84bb598c726d9beac02018207",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      },
+      "history": [
+        {
+          "target": "a707cc27ba36d3fa79450c9cffcc48a82d080b02",
+          "freshness": "CURRENT",
+          "outcome": "unchanged",
+          "lines": [
+            3,
+            3
+          ]
+        },
+        {
+          "target": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+          "freshness": "CURRENT",
+          "outcome": "unchanged",
+          "lines": [
+            3,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H05",
+      "source": "P2-033",
+      "commit": "4c5cfe8f07f1c76d4f04277e803f20e6039f5191",
+      "path": "home-mixer/params/param.rs",
+      "start_line": 401,
+      "end_line": 401,
+      "anchor": "ReportWeight",
+      "span_sha256": "73b53423cd86f366f604328a7ca3e70d73ce26817b8e263f68f31534075410a3",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      },
+      "history": [
+        {
+          "target": "a707cc27ba36d3fa79450c9cffcc48a82d080b02",
+          "freshness": "CURRENT",
+          "outcome": "relocated",
+          "lines": [
+            408,
+            408
+          ]
+        },
+        {
+          "target": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+          "freshness": "CURRENT",
+          "outcome": "relocated",
+          "lines": [
+            408,
+            408
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H06",
+      "source": "P1-028",
+      "commit": "a707cc27ba36d3fa79450c9cffcc48a82d080b02",
+      "path": "home-mixer/sources/phoenix_source.rs",
+      "start_line": 98,
+      "end_line": 102,
+      "anchor": "has_cached_posts",
+      "span_sha256": "1ac90b70c67abe24d3040ed41a3149a0248071ae162f70ae27acaff0de45bcdd",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      },
+      "history": [
+        {
+          "target": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+          "freshness": "CURRENT",
+          "outcome": "identical",
+          "lines": [
+            98,
+            102
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H07",
+      "source": "P1-016",
+      "commit": "4c5cfe8f07f1c76d4f04277e803f20e6039f5191",
+      "path": "home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs",
+      "start_line": 418,
+      "end_line": 419,
+      "anchor": "vec![phoenix_scorer, vm_ranker]",
+      "span_sha256": "d4978a61db6309208857ef8ce327bb444d52e4bd2afef042423802243b04f372",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      },
+      "history": [
+        {
+          "target": "a707cc27ba36d3fa79450c9cffcc48a82d080b02",
+          "freshness": "CURRENT",
+          "outcome": "identical",
+          "lines": [
+            418,
+            419
+          ]
+        },
+        {
+          "target": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+          "freshness": "CURRENT",
+          "outcome": "identical",
+          "lines": [
+            418,
+            419
+          ]
+        }
+      ]
+    },
+    {
+      "id": "H08",
+      "source": "P1b-010",
+      "commit": "a707cc27ba36d3fa79450c9cffcc48a82d080b02",
+      "path": "home-mixer/params/param.rs",
+      "start_line": 16,
+      "end_line": 21,
+      "anchor": "PhoenixColdStartMaxResults",
+      "span_sha256": "34d5e5953e19602e1469381c75f7a546af0b80558bbb54a8d28ee5247f8544ce",
+      "expected": {
+        "verdict": "INTACT",
+        "anchor": "FOUND"
+      },
+      "history": [
+        {
+          "target": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+          "freshness": "STALE",
+          "outcome": "changed",
+          "proposed_lines": [
+            16,
+            21
+          ]
+        }
+      ]
+    }
+  ]
+}

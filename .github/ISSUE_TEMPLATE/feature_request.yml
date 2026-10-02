@@ -1,0 +1,28 @@
+name: Feature request
+description: Suggest an improvement that keeps every answer traceable to exact bytes at a commit
+title: "[feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: "Out of scope: reach predictions, ranking scores, X API access, scraping, posting or engagement automation (see What it is not in the README)."
+  - type: textarea
+    id: question
+    attributes:
+      label: The question you want to answer about the upstream code
+    validations:
+      required: true
+  - type: textarea
+    id: wish
+    attributes:
+      label: What you would like TimelineXray to do
+    validations:
+      required: true
+  - type: textarea
+    id: citation
+    attributes:
+      label: How the result would be cited
+      description: "Commit, path, lines, anchor."
+    validations:
+      required: false

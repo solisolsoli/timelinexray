@@ -1,0 +1,8 @@
+# The sdist ships the package, its metadata and the licence files only. The test suite
+# runs from a repository checkout: it reads goldens/, schemas/, docs/, AGENTS.md and the
+# git history, so a partial copy of tests/ in the sdist could never run (FA-016).
+# scripts/build_check.py fails when the sdist contains a tests/ entry.
+prune tests
+prune scripts
+prune .github
+global-exclude __pycache__ *.py[cod]
