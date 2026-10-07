@@ -266,8 +266,10 @@ class ImportTest(unittest.TestCase):
         memory = FindingsMemory(Ledger(ledger), store)  # type: ignore[arg-type]
         report = memory.import_file(EXAMPLE, "EXAMPLE", IMPORTER)
         self.assertEqual(report["unpinned_commits"], {FIXTURE.commit: 4})
-        self.assertIn(f"txray pin {FIXTURE.commit}", report["hint"])
-        self.assertIn("txray findings verify --label EXAMPLE", report["hint"])
+        # one command (``txray pin`` takes a single commit, so a list of them was no command)
+        self.assertIn("txray findings verify --pin-cited --label EXAMPLE", report["hint"])
+        self.assertIn("4 citation(s) name 1 commit(s)", report["hint"])
+        self.assertNotIn("txray pin ", report["hint"])
         before = memory.get("EXAMPLE:EX-001")
         self.assertEqual(before.record["sources"][0]["resolution"], "commit_not_pinned")
         self.assertEqual(before.resolved_citations()[0]["span_sha256"], None)
@@ -320,9 +322,9 @@ class ImportTest(unittest.TestCase):
                                   "EXAMPLE", "--actor", "importer-1", *args])
         self.assertEqual((code, err), (0, b""))
         self.assertIn(b"unpinned   " + FIXTURE.commit.encode(), out)
-        self.assertIn(b"next       4 citation(s) name commits this store has not pinned; to "
-                      b"resolve them: txray pin " + FIXTURE.commit.encode()
-                      + b"; then txray findings verify --label EXAMPLE", out)
+        self.assertIn(b"next       4 citation(s) name 1 commit(s) this store has not pinned; to "
+                      b"resolve them in one step: txray findings verify --pin-cited --label "
+                      b"EXAMPLE", out)
         code, out, _ = run_cli(["findings", "show", "EXAMPLE:EX-001", *args])
         self.assertEqual(code, 0)
         self.assertIn(b"span not resolved", out)
@@ -344,6 +346,8 @@ class ImportTest(unittest.TestCase):
         self.assertIn(b"EXAMPLE:EX-001           CURRENT       spans INTACT  (1 citation(s) "
                       b"resolved now)", out)
         self.assertNotIn(b"next       ", out)  # nothing was re-anchored before, so no recheck
+        # EX-004 reads now but its anchor is missing: unusable, not an unpinned commit
+        self.assertNotIn(b"unpinned", out)
         code, out, _ = run_cli(["findings", "show", "EXAMPLE:EX-001", *args])
         self.assertEqual(code, 0)
         self.assertIn(b"(resolved by a later verify)", out)

@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from timelinexray.diff import CLASSES, DiffEngine, SymbolSource
+from timelinexray.diff import CLASSES, DiffEngine, SymbolSource, rules
 from timelinexray.diff.analysis import BlobAnalysis
 from timelinexray.diff.hunks import align_hunks, apply_hunks, line_hunks, split_lines
 from timelinexray.diff.model import Hunk
@@ -158,7 +158,7 @@ class ClassificationTest(unittest.TestCase):
         self.assertEqual(unknown["util/strings.rs"].new_symbols, ("trim",))
         self.assertEqual(set(unknown), {"util/strings.rs", "util/constants.py", "added/fresh.rs",
                                         "gone/removed.rs", "svc/request_handler.rs",
-                                        "assets/blob.bin"})
+                                        "assets/blob.bin", "visibility/rules.rs"})
         self.assertEqual(unknown["svc/request_handler.rs"].new_symbols, ("lookup",))
         self.assertEqual(unknown["svc/request_handler.rs"].status, "renamed")
 
@@ -322,6 +322,152 @@ class ValueParserTest(unittest.TestCase):
         self.assertEqual(self._values("Cargo.toml", "toml", b"[package]\nversion = \"1\"\n"), {})
         json_values = self._values("conf/a.json", "json", b'{\n  "a": {\n    "b": 2,\n    "c": true\n  }\n}\n')
         self.assertEqual(json_values, {"a.b": ("config-key", "2"), "a.c": ("config-key", "true")})
+
+
+class ClassifierV2Test(unittest.TestCase):
+    """Classifier v2 rules (build-dependency, train/, test names, unknown reasons, the
+    deciding name rule), each on synthetic two-commit fixtures, including the cases they must not take."""
+
+    def _diff(self, old: dict[str, bytes], new: dict[str, bytes]):
+        fixture = _Fixture([old, new])
+        self.addCleanup(fixture.cleanup)
+        return DiffEngine(fixture.store).diff(*fixture.commits)
+
+    def _classes(self, old: dict[str, bytes], new: dict[str, bytes]) -> dict[str, set[str]]:
+        found: dict[str, set[str]] = {}
+        for item in self._diff(old, new).items:
+            found.setdefault(item.path, set()).add(item.change_class)
+        return found
+
+    def test_fixture_items_of_the_new_classes(self) -> None:
+        [build] = _items("build-dependency", "svc/BUILD.bazel")
+        self.assertEqual(build.kind, "file")
+        [imports] = _items("build-dependency", "svc/wiring.rs")
+        self.assertEqual((imports.kind, imports.new.start_line, imports.new.end_line), ("region", 1, 2))
+        self.assertIn("import or module declarations", imports.summary)
+        # no filtering/visibility name rule: such code stays unknown (see docs/updates.md)
+        [filtering] = _items(None, "visibility/rules.rs")
+        self.assertEqual((filtering.change_class, filtering.detail),
+                         ("unknown", {"unknown_reason": "no-rule"}))
+        [scoring] = _items("scoring-logic")
+        self.assertEqual(scoring.detail["matched_by"],
+                         [{"rule": "path", "name": "scorers/weighted_scorer.rs"}])
+        self.assertNotIn("matched_by", imports.detail)
+        for item in _items("unknown"):
+            self.assertIn(item.detail["unknown_reason"], ("no-rule", "not-parsed", "not-text", "mode-only"))
+        self.assertEqual(_items("unknown", "assets/blob.bin")[0].detail["unknown_reason"], "not-text")
+        self.assertEqual(_items("unknown", "util/constants.py")[0].detail["unknown_reason"], "no-rule")
+
+    def test_build_paths(self) -> None:
+        for path in ("BUILD", "a/BUILD.bazel", "WORKSPACE", "x/defs.bzl", "crate/Cargo.toml",
+                     "crate/build.rs", "requirements.txt", "requirements-dev.txt", "Makefile",
+                     "svc/Dockerfile", "pom.xml", "build.gradle.kts", "build.sbt", "go.mod",
+                     "cmake/deps.cmake", "pyproject.toml", "setup.py"):
+            with self.subTest(path):
+                self.assertTrue(rules.is_build_path(path))
+                self.assertEqual(rules.path_class(path, None), "build-dependency")
+        for path in ("builder.rs", "src/build_index.py", "rebuild.sh", "config/app.yaml",
+                     "docs/requirements.md"):
+            with self.subTest(path):
+                self.assertFalse(rules.is_build_path(path))
+        # earlier path rules keep their files
+        self.assertEqual(rules.path_class("tests/BUILD", None), "test-only")
+        self.assertEqual(rules.path_class("docs/Makefile", None), "docs-only")
+        self.assertEqual(rules.path_class("vendor/x/BUILD", "vendored"), "generated-vendored")
+
+    def test_build_manifest_change_is_one_file_item(self) -> None:
+        old = {"crate/Cargo.toml": b'[package]\nname = "a"\nversion = "1.0.0"\n'}
+        new = {"crate/Cargo.toml": b'[package]\nname = "a"\nversion = "1.1.0"\n'}
+        [item] = self._diff(old, new).items
+        self.assertEqual((item.change_class, item.kind), ("build-dependency", "file"))
+
+    def test_import_only_hunks(self) -> None:
+        body = b"\npub fn run() -> u8 {\n    1\n}\n"
+        cases = {
+            "r.rs": (b"use a::b;\n" + body, b"use a::b;\nuse a::c;\n" + body),
+            "m.rs": (b"mod one;\n" + body, b"mod one;\npub mod two;\n" + body),
+            "p.py": (b"import os\n\ndef run():\n    return 1\n",
+                     b"import os\nfrom sys import argv\n\ndef run():\n    return 1\n"),
+            "J.java": (b"import a.B;\n\nclass J {\n  int f() { return 1; }\n}\n",
+                       b"import a.B;\nimport a.C;\n\nclass J {\n  int f() { return 1; }\n}\n"),
+            "multi.rs": (b"use a::{\n    b,\n};\n" + body, b"use a::{\n    b,\n    c,\n};\n" + body),
+        }
+        old = {path: pair[0] for path, pair in cases.items()}
+        new = {path: pair[1] for path, pair in cases.items()}
+        found = self._classes(old, new)
+        self.assertEqual(found, {path: {"build-dependency"} for path in cases})
+
+    def test_import_rule_never_takes_code(self) -> None:
+        body = b"\npub fn run() -> u8 {\n    1\n}\n"
+        old = {
+            # an import and a code line change in one hunk
+            "mixed.rs": b"use a::b;\nconst LIMIT: usize = compute();\n" + body,
+            # a module with a body is code, not a declaration
+            "inline.rs": b"mod inner {\n    pub fn x() -> u8 { 1 }\n}\n" + body,
+            # a comment-only change stays cosmetic
+            "note.rs": b"use a::b; // first\n" + body,
+            # a language without symbols is never an import change
+            "lib.cc": b"#include <a>\nint f() { return 1; }\n",
+        }
+        new = {
+            "mixed.rs": b"use a::c;\nconst LIMIT: usize = compute_more();\n" + body,
+            "inline.rs": b"mod inner {\n    pub fn x() -> u8 { 2 }\n}\n" + body,
+            "note.rs": b"use a::b; // second\n" + body,
+            "lib.cc": b"#include <a>\n#include <b>\nint f() { return 1; }\n",
+        }
+        found = self._classes(old, new)
+        self.assertNotIn("build-dependency", found["mixed.rs"])
+        self.assertNotIn("build-dependency", found["inline.rs"])
+        self.assertEqual(found["note.rs"], {"cosmetic"})
+        self.assertEqual(found["lib.cc"], {"unknown"})
+
+    def test_filtering_names_are_not_a_class(self) -> None:
+        """A filtering/visibility name rule was measured and rejected (its items were mostly
+        caches, telemetry and tooling): such paths and symbols stay unknown."""
+        fn_old, fn_new = b"pub fn f() -> u8 {\n    1\n}\n", b"pub fn f() -> u8 {\n    2\n}\n"
+        paths = {
+            "visibility-filtering/hydration/store.rs": "unknown",
+            "home-mixer/filters/age_filter.rs": "unknown",
+            "brand_safety/check.rs": "unknown",
+            "home-mixer/scorers/filter_scorer.rs": "scoring-logic",  # scoring path wins
+            "visibility-filtering/models/label.rs": "model-config",  # model path wins
+            "visibility-filtering/tests/rules.rs": "test-only",  # test path wins
+            "util/strings.rs": "unknown",
+        }
+        found = self._classes({p: fn_old for p in paths}, {p: fn_new for p in paths})
+        self.assertEqual(found, {path: {cls} for path, cls in paths.items()})
+        # an enclosing symbol name decides the scoring class when no path rule does
+        old = {"svc/pipeline.rs": b"pub fn apply_filters() -> u8 {\n    1\n}\n"
+                                  b"pub fn rank_score() -> u8 {\n    1\n}\n"}
+        new = {"svc/pipeline.rs": b"pub fn apply_filters() -> u8 {\n    2\n}\n"
+                                  b"pub fn rank_score() -> u8 {\n    2\n}\n"}
+        items = sorted((i.new_symbols, i.change_class, i.detail.get("matched_by"))
+                       for i in self._diff(old, new).items)
+        self.assertEqual(items, [
+            (("apply_filters",), "unknown", None),
+            (("rank_score",), "scoring-logic", [{"rule": "symbol", "name": "rank_score"}]),
+        ])
+
+    def test_train_directory_and_test_names(self) -> None:
+        self.assertTrue(rules.is_model_config_path("phoenix/xrex/train/trainer.py"))
+        self.assertFalse(rules.is_model_config_path("phoenix/xrex/trainer/run.py"))
+        for path in ("client/test_support.rs", "svc/test_helpers.py", "lib/ledger_contract_fixtures.rs",
+                     "lib/fixture.rs"):
+            with self.subTest(path):
+                self.assertTrue(rules.is_test_path(path))
+        for path in ("svc/test_user.rs", "svc/contest.rs", "svc/fixtures_loader.rs"):
+            with self.subTest(path):
+                self.assertFalse(rules.is_test_path(path))
+
+    def test_unknown_reasons(self) -> None:
+        old = {"svc/run.rs": b"pub fn run() -> u8 {\n    1\n}\n", "kern/k.cu": b"int k() { return 1; }\n",
+               "tool.sh": b"echo a\n"}
+        new = {"svc/run.rs": b"pub fn run() -> u8 {\n    2\n}\n", "kern/k.cu": b"int k() { return 2; }\n",
+               "tool.sh": b"echo b\n"}
+        reasons = {i.path: (i.change_class, i.detail["unknown_reason"]) for i in self._diff(old, new).items}
+        self.assertEqual(reasons, {"svc/run.rs": ("unknown", "no-rule"),
+                                   "kern/k.cu": ("unknown", "not-parsed"),
+                                   "tool.sh": ("unknown", "not-parsed")})
 
 
 class HunkTest(unittest.TestCase):

@@ -35,12 +35,14 @@ from ..diff.history import (
 )
 from ..diff.model import ChangeItem, CommitDiff
 from ..diff.rules import (
+    CLASS_CAVEATS,
     CLASS_EVIDENCE,
     CLASS_TITLES,
     CLASSES,
     CLASSIFIER_VERSION,
     PARAMETER_DEFAULT,
     REGISTRATION,
+    SCORING_LOGIC,
 )
 from ..diff.symbols import SymbolSource
 from ..netguard import DEFAULT_UPSTREAM_URL, Allowlist
@@ -253,9 +255,11 @@ class DigestBuilder:
             },
             "events": [event.to_dict() for event in events],
             "classes": [
-                {"class": name, "title": CLASS_TITLES[name], "evidence": CLASS_EVIDENCE[name]}
+                {"class": name, "title": CLASS_TITLES[name], "evidence": CLASS_EVIDENCE[name],
+                 "must_not_be_read_as": CLASS_CAVEATS[name]}
                 for name in CLASSES
             ],
+            "overview": overview(items),
             "summary": {
                 "net": net.counts(),
                 "items_by_class_across_steps": across,
@@ -295,6 +299,88 @@ class DigestBuilder:
             "inputs_sha256": hashlib.sha256(_canonical(inputs)).hexdigest(),
         }
         return document
+
+
+def digest_summary(document: dict[str, Any]) -> dict[str, Any]:
+    """The few numbers a command prints and ``update-status.json`` keeps about a digest."""
+    summary = document.get("overview") or overview(document["items"])
+    rows = {row["class"]: row for row in summary["classes"]}
+    return {
+        "range": {key: document["range"][key] for key in ("relationship", "commits_in_range",
+                                                          "history_complete")},
+        "old": document["range"]["old"]["commit"],
+        "new": document["range"]["new"]["commit"],
+        "items_by_class": document["summary"]["net"]["items_by_class"],
+        "parameter_changes": len(document["parameters"]["net"]),
+        "registration_changes": len(document["registrations"]["net"]),
+        "unknown_reasons": rows["unknown"].get("reasons", {}),
+        "affected_findings": (len({row["finding_id"] for row in document["affected_findings"]["findings"]})
+                              if document["affected_findings"]["available"] else None),
+        "events": document["events"],
+        "inputs_sha256": document["inputs_sha256"],
+    }
+
+
+#: Classes whose items the main Markdown digest lists with citations (parameter defaults and
+#: registrations as tables); every other class is counted there and listed in the appendix.
+MAIN_CLASSES = (PARAMETER_DEFAULT, REGISTRATION, SCORING_LOGIC)
+
+
+def area_of(path: str) -> str:
+    """The area a path is counted under: its first two directories (``a/b`` for
+    ``a/b/c/d.rs``), its directory for ``a/d.rs``, or ``(top level)``."""
+    parts = path.split("/")
+    if len(parts) == 1:
+        return "(top level)"
+    return "/".join(parts[: min(2, len(parts) - 1)])
+
+
+def _path_order(path: str) -> bytes:
+    return path.encode("utf-8", "surrogateescape")
+
+
+def overview(items: list[dict[str, Any]]) -> dict[str, Any]:
+    """Per class: item, file and line counts, the areas they fall in, and for logic classes
+    which name rule decided them; for ``unknown`` the reasons. Derived from ``items`` only,
+    so a reader of the JSON need not scan every item to see where the changes are."""
+    classes = []
+    for name in CLASSES:
+        chosen = [item for item in items if item["class"] == name]
+        files: dict[str, int] = {}
+        areas: dict[str, dict[str, Any]] = {}
+        for item in chosen:
+            path = item["new_path"] or item["old_path"]
+            files[path] = files.get(path, 0) + 1
+            row = areas.setdefault(area_of(path), {"items": 0, "files": set()})
+            row["items"] += 1
+            row["files"].add(path)
+        entry: dict[str, Any] = {
+            "class": name,
+            "items": len(chosen),
+            "files": len(files),
+            "lines_added": sum(h["new_count"] for item in chosen for h in item["hunks"]),
+            "lines_removed": sum(h["old_count"] for item in chosen for h in item["hunks"]),
+            "listed_in": "main" if name in MAIN_CLASSES else "appendix",
+            "areas": [
+                {"area": area, "items": row["items"], "files": len(row["files"])}
+                for area, row in sorted(areas.items(),
+                                        key=lambda kv: (-kv[1]["items"], _path_order(kv[0])))
+            ],
+        }
+        if name == SCORING_LOGIC or any("matched_by" in i["detail"] for i in chosen):
+            rules: dict[str, int] = {}
+            for item in chosen:
+                matched = item["detail"].get("matched_by") or [{"rule": "none"}]
+                rules[matched[0]["rule"]] = rules.get(matched[0]["rule"], 0) + 1
+            entry["decided_by"] = dict(sorted(rules.items()))
+        if any("unknown_reason" in item["detail"] for item in chosen):
+            reasons: dict[str, int] = {}
+            for item in chosen:
+                reason = item["detail"].get("unknown_reason", "unrecorded")
+                reasons[reason] = reasons.get(reason, 0) + 1
+            entry["reasons"] = dict(sorted(reasons.items()))
+        classes.append(entry)
+    return {"classes": classes}
 
 
 def _hunks(item: ChangeItem, side: str) -> tuple[tuple[int, int], ...]:

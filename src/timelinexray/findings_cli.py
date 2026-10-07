@@ -6,8 +6,9 @@
     txray findings import     FILE --source-label LABEL --actor NAME
     txray findings list       [--workflow W] [--status S] [--freshness F] [--target C] [--current]
     txray findings show       ID [--target C]
-    txray findings verify     [ID ...]
-    txray findings reanchor   (TARGET | --latest) [ID ...] [--strict]
+    txray findings verify     [ID ...] [--label L] [--pin-cited [--upstream URL]]
+    txray findings reanchor   (TARGET | --latest) [ID ...] [--strict] [--summary]
+    txray findings stale      [--target C] [--limit N] [--spec-dir DIR]
     txray findings review     ID --actor NAME --role reviewer --status S --rationale TEXT [--target C]
     txray findings supersede  ID --actor NAME (--by ID | --file SPEC.json) --rationale TEXT
     txray findings retract    ID --actor NAME --reason TEXT
@@ -27,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +46,9 @@ from .findings import (
 )
 from .findings.freshness import READINGS, PinIndex, describe, evaluate, is_current
 from .findings.model import EVIDENCE_CLASSES, ROLES, SCOPES
+from .findings.stale import Worklist, unpinned_commits, worklist, worktree_of
+from .fsutil import atomic_write, check_output_directory
+from .netguard import DEFAULT_UPSTREAM_URL, Allowlist
 from .snapshot.store import default_store_root
 
 
@@ -154,6 +159,18 @@ def _cmd_import(args: argparse.Namespace) -> int:
 
 def _counts(counter: dict[str, int]) -> str:
     return ", ".join(f"{key} {value}" for key, value in sorted(counter.items())) or "none"
+
+
+def _location_args(args: argparse.Namespace) -> tuple[list[str], list[str]]:
+    """The ``--store`` and ``--ledger`` options of this run, for printed commands."""
+    store = ["--store", str(args.store)] if args.store else []
+    ledger = ["--ledger", str(args.ledger)] if getattr(args, "ledger", None) else []
+    return store, ledger
+
+
+def _worklist(args: argparse.Namespace, memory: FindingsMemory, target: str | None) -> Worklist:
+    store, ledger = _location_args(args)
+    return worklist(memory, target, store_args=store, ledger_args=ledger)
 
 
 # -- list / show / queue ----------------------------------------------------------------------------
@@ -290,6 +307,135 @@ def _cmd_queue(args: argparse.Namespace) -> int:
     return 0
 
 
+def _span_text(span: dict[str, Any] | None, *, verdict: str | None = None) -> str:
+    if not span:
+        return "-"
+    sha = (span.get("span_sha256") or "not resolved")[:16]
+    text = (f"{str(span.get('commit') or '')[:12]} lines {span.get('start_line')}-"
+            f"{span.get('end_line')}  sha256 {sha}")
+    if verdict is not None:
+        return f"{text}  anchor {verdict}"
+    return f"{text}  anchor {span.get('anchor')!r}"
+
+
+def _batch_lines(batch: list[dict[str, Any]], width: int = 11) -> list[str]:
+    lines = []
+    for step in batch:
+        count = len(step["findings"])
+        what = (f"{count} finding(s) cite {len(step['commits'])} commit(s) this store has not "
+                "pinned" if "commits" in step else f"{count} finding(s) have no check at the target")
+        lines.append(f"{'batch':<{width}}{what}: {step['command']}")
+        lines.append(f"{'':<{width}}({step['effect']})")
+    return lines
+
+
+def _entry_lines(entry: dict[str, Any], spec_dir: str | None) -> list[str]:
+    title = (entry.get("title") or "")[:70]
+    lines = [f"[{entry['rank']}] {_cli._display(entry['finding_id'])}  {entry['freshness']}  "
+             f"{entry['area']}  {entry['evidence_class']}  {entry['status']} "
+             f"({entry['status_basis']})  {entry['workflow']}",
+             f"    title      {_cli._display(title)}"]
+    for citation in entry["citations"]:
+        old = citation["old"] or {}
+        lines.append(f"    citation {citation['index']}  {citation['outcome']}  "
+                     f"{_cli._display(str(old.get('path')))}")
+        lines.append(f"      old        {_cli._display(_span_text(old))}")
+        candidate = citation["candidate"]
+        if candidate:
+            lines.append(f"      candidate  {_span_text(candidate, verdict=candidate.get('anchor_verdict'))}"
+                         "  (line diff; a proposal, not a check)")
+        for occurrence in citation["candidates"][:5]:
+            lines.append(f"      occurs     {_cli._display(str(occurrence.get('path')))}:"
+                         f"{occurrence.get('start_line')}-{occurrence.get('end_line')}")
+        if not candidate and not citation["candidates"] and citation["reason"]:
+            lines.append(f"      why        {_cli._display(citation['reason'])}")
+    for dependency in entry["dependencies"]:
+        lines.append(f"    dependency {dependency.get('finding_id') or dependency.get('label') or 'span'}"
+                     f" {dependency.get('freshness')}: {dependency.get('reason') or ''}".rstrip())
+    if entry["negative"]:
+        lines.append(f"    negative   {entry['negative'].get('freshness')}: "
+                     f"{entry['negative'].get('total', '?')} hit(s)")
+    commands = entry["commands"]
+    for number, command in enumerate(commands["read"]):
+        lines.append(f"    {'read' if number == 0 else '':<10} {_cli._display(command)}")
+    decide = commands["decide"]
+    if decide["supersede"]:
+        supersede = decide["supersede"]
+        if spec_dir:
+            supersede = supersede.replace("SPEC_DIR", spec_dir)
+        lines.append(f"    holds      edit the draft (claim, then delete \"remove_after_reading\"), "
+                     "then:")
+        lines.append(f"               {_cli._display(supersede)}")
+        lines.append(f"               {_cli._display(decide['verify_successor'])}")
+        lines.append(f"      review   {_cli._display(decide['review_successor'])}  "
+                     "(a different reviewer)")
+    else:
+        lines.append(f"    holds      no draft: {entry['draft']['why_not']}; supersede with a "
+                     "corrected specification (txray findings supersede ID --file SPEC.json)")
+    lines.append(f"    as is      {_cli._display(decide['assess_at_target'])}")
+    lines.append(f"    withdraw   {_cli._display(decide['retract'])}")
+    return lines
+
+
+def _write_drafts(args: argparse.Namespace, memory: FindingsMemory, work: Worklist,
+                  entries: list[dict[str, Any]]) -> list[str]:
+    """Write the successor drafts into ``--spec-dir`` (never inside a git working tree)."""
+    out = check_output_directory(Path(args.spec_dir), store_root=memory.store.root,
+                                 ledger=memory.ledger.directory, option="--spec-dir")
+    tree = worktree_of(out)
+    if tree is not None:
+        raise InvalidInput(f"refused: --spec-dir {out} lies inside the git working tree {tree}; "
+                           "drafts copy finding claims, so write them outside every working tree")
+    written = []
+    for entry in entries:
+        spec = work.draft_successor(entry)
+        if spec is None:
+            continue
+        path = out / work.spec_name(entry["draft"]["successor_id"])
+        atomic_write(path, (json.dumps(spec, indent=2, sort_keys=True, ensure_ascii=True)
+                            + "\n").encode("ascii"))
+        written.append(str(path))
+    return written
+
+
+def _cmd_stale(args: argparse.Namespace) -> int:
+    memory = _memory(args)
+    work = _worklist(args, memory, args.target)
+    limit = None if args.limit == 0 else args.limit
+    shown = work.entries if limit is None else work.entries[:limit]
+    written = _write_drafts(args, memory, work, work.entries) if args.spec_dir else []
+    data = work.to_dict(limit=None if args.json else limit)
+    data["drafts_written"] = written
+    if args.json:
+        _emit(args, data)
+        return 0
+    counts = data["counts"]
+    newest = data["newest_pin"]
+    lines = [f"stale review  target {work.target[:12]}"
+             + ("  (newest pin)" if newest == work.target else "")
+             + f"  ledger head {work.view.head[:16]}",
+             f"not current   {counts['not_current']} to re-review of {counts['checkable']} "
+             f"checkable finding(s); freshness {_counts(counts['freshness'])}; areas "
+             f"{_counts(counts['by_area'])}",
+             *_batch_lines(data["batch"], width=14),
+             f"order         {data['order']}",
+             f"note          {data['note']}"]
+    if written:
+        lines.append(f"drafts        {len(written)} successor specification(s) in {args.spec_dir}")
+    elif counts["drafts_possible"]:
+        lines.append(f"drafts        {counts['drafts_possible']} successor draft(s) possible: add "
+                     "--spec-dir DIR (outside every working tree) to write them")
+    for entry in shown:
+        lines.append("")
+        lines.extend(_entry_lines(entry, args.spec_dir))
+    if len(shown) < len(work.entries):
+        lines.append("")
+        lines.append(f"shown {len(shown)} of {len(work.entries)}; --limit 0 lists all, --json "
+                     "gives every entry with its commands")
+    _cli._write("\n".join(lines) + "\n")
+    return 0
+
+
 # -- verify / reanchor ----------------------------------------------------------------------------
 
 
@@ -297,14 +443,89 @@ def _checker(args: argparse.Namespace) -> Actor:
     return Actor(args.actor, args.role or "verifier") if args.actor else VERIFIER_ACTOR
 
 
+def _selected(view: Any, finding_ids: list[str], label: str | None) -> list[FindingState]:
+    if finding_ids:
+        return [state for state in (view.get(i) for i in finding_ids) if state is not None]
+    return [state for state in view.states() if state.active and (
+        label is None or (state.record.get("origin") or {}).get("source_label") == label)]
+
+
+def _pin_cited(args: argparse.Namespace, memory: FindingsMemory) -> dict[str, Any]:
+    """Pin every commit the selected findings cite that the store has not pinned.
+
+    The pin is :meth:`SnapshotStore.pin`: the guarded fetch from the allowlisted upstream runs
+    only when the mirror does not hold the commit. Nothing else is written here."""
+    view = memory.view()
+    selected = _selected(view, args.finding_ids or [], args.label)
+    pins = PinIndex.of(memory.store)
+    wanted = sorted({commit for state in selected for commit in unpinned_commits(state, pins)})
+    if args.upstream is not None:
+        upstream = args.upstream
+    elif len(pins.by_upstream) == 1:
+        upstream = next(iter(pins.by_upstream))
+    elif not pins.by_upstream:
+        upstream = DEFAULT_UPSTREAM_URL
+    else:
+        raise InvalidInput("the store holds pins of several upstreams; give --upstream URL")
+    allowlist = Allowlist.from_env()
+    pinned = []
+    for commit in wanted:
+        result = memory.store.pin(commit, upstream, allowlist=allowlist)
+        pinned.append({"commit": result.pin.commit, "created": result.created,
+                       "fetched": result.fetched})
+    affected = sorted(state.finding_id for state in selected if unpinned_commits(state, pins))
+    return {"upstream": upstream, "pinned": pinned, "findings": affected}
+
+
 def _cmd_verify(args: argparse.Namespace) -> int:
-    results = _memory(args).verify(args.finding_ids or None, actor=_checker(args),
-                                   label=args.label, expect_head=args.expect_head)
+    if args.upstream is not None and not args.pin_cited:
+        raise InvalidInput("--upstream is used only with --pin-cited")
+    memory = _memory(args)
+    pinning = _pin_cited(args, memory) if args.pin_cited else None
+    if pinning is not None and pinning["findings"] and not args.finding_ids \
+            and args.label is None:
+        # only the findings whose citations were unresolved (nothing pinned: every finding)
+        results = memory.verify(pinning["findings"], actor=_checker(args),
+                                expect_head=args.expect_head)
+    else:
+        results = memory.verify(args.finding_ids or None, actor=_checker(args),
+                                label=args.label, expect_head=args.expect_head)
+    rechecks: list[dict[str, Any]] = []
+    if pinning is not None:
+        by_target: dict[str, list[str]] = {}
+        for result in results:
+            for target in result.get("recheck_targets") or ():
+                by_target.setdefault(target, []).append(result["finding_id"])
+        for target, ids in sorted(by_target.items()):
+            report = memory.reanchor(target, ids, actor=_checker(args))
+            rechecks.append({"target": report["target"], "findings": report["findings"],
+                             "freshness": report["freshness"]})
+    view = memory.view()
+    pins_now = PinIndex.of(memory.store)
+    still = sorted({commit for state in _selected(view, args.finding_ids or [], args.label)
+                    for commit in unpinned_commits(state, pins_now)})
+    store_args, ledger_args = _location_args(args)
+    hint = None
+    if still:
+        hint = shlex.join(["txray", "findings", "verify", "--pin-cited",
+                           *(["--label", args.label] if args.label else []),
+                           *args.finding_ids, *store_args, *ledger_args])
     if args.json:
-        _emit(args, {"results": results})
+        _emit(args, {"results": results, "pin_cited": pinning, "rechecked": rechecks,
+                     "unpinned_commits": still, "hint": hint})
         return 0
-    lines = [f"verified {sum(1 for r in results if 'skipped' not in r)} finding(s) at their "
-             "cited commits (integrity only; statuses unchanged)"]
+    lines = []
+    if pinning is not None:
+        created = sum(1 for item in pinning["pinned"] if item["created"])
+        fetched = sum(1 for item in pinning["pinned"] if item["fetched"])
+        lines.append(f"pinned     {len(pinning['pinned'])} cited commit(s) "
+                     f"({created} new, {fetched} fetched from {pinning['upstream']}; the rest "
+                     "were already in the mirror) for "
+                     f"{len(pinning['findings'])} finding(s)")
+        for item in pinning["pinned"]:
+            lines.append(f"           {item['commit']}")
+    lines.append(f"verified {sum(1 for r in results if 'skipped' not in r)} finding(s) at their "
+                 "cited commits (integrity only; statuses unchanged)")
     recheck: set[str] = set()
     for result in results:
         if "skipped" in result:
@@ -316,11 +537,23 @@ def _cmd_verify(args: argparse.Namespace) -> int:
                      f"{result['verdict'] or '-'}{resolved}"
                      + (f"  {result['reasons'][0]}" if result["reasons"] else ""))
         recheck.update(result.get("recheck_targets") or ())
-    if recheck:
+    for item in rechecks:
+        lines.append(f"reanchored {item['findings']} finding(s) again at {item['target'][:12]} "
+                     f"(their earlier check was made from unresolved citations): "
+                     f"{_counts(item['freshness'])}")
+    if recheck and not rechecks:
         lines.append("next       citations were resolved after re-anchoring checks at "
                      + ", ".join(sorted(c[:12] for c in recheck))
                      + "; those checks no longer count: run txray findings reanchor "
                      "<target> (or --latest) again")
+    if hint:
+        lines.append(f"unpinned   {len(still)} cited commit(s) are not pinned in this store")
+        lines.append(f"next       {hint}   (pins them, re-verifies and re-anchors; "
+                     "freshness only)")
+    elif rechecks:
+        target = rechecks[-1]["target"][:12]
+        lines.append(f"next       txray findings stale --target {target}   (the re-review "
+                     "list at that commit)")
     _cli._write("\n".join(lines) + "\n")
     return 0
 
@@ -344,18 +577,43 @@ def _cmd_reanchor(args: argparse.Namespace) -> int:
     report = memory.reanchor(target, args.finding_ids or None, actor=_checker(args),
                              expect_head=args.expect_head)
     stale = [r for r in report["results"] if r["freshness"] != "CURRENT"]
+    summary = _worklist(args, memory, report["target"]).summary()
+    report["stale_review"] = summary
     if args.json:
         _emit(args, report)
     else:
         lines = [f"target     {report['target']}",
                  f"findings   {report['findings']}: {_counts(report['freshness'])}"]
-        for result in report["results"]:
-            moved = "  (new provenance revision)" if result["provenance"] else ""
-            lines.append(f"{result['finding_id']:<24} {result['freshness']:<13} "
-                         f"{_counts(result['outcomes'])}{moved}"
-                         + (f"  {result['reasons'][0]}" if result["reasons"] else ""))
+        if not args.summary:
+            for result in report["results"]:
+                moved = "  (new provenance revision)" if result["provenance"] else ""
+                lines.append(f"{result['finding_id']:<24} {result['freshness']:<13} "
+                             f"{_counts(result['outcomes'])}{moved}"
+                             + (f"  {result['reasons'][0]}" if result["reasons"] else ""))
+        lines.extend(_summary_lines(summary))
         _cli._write("\n".join(lines) + "\n")
     return 1 if args.strict and stale else 0
+
+
+def _summary_lines(summary: dict[str, Any]) -> list[str]:
+    """The stale-review summary after a re-anchoring (``reanchor`` and ``update --reanchor``)."""
+    counts = summary["counts"]
+    lines = []
+    if counts["not_current"] or counts["unpinned_findings"]:
+        lines.append(f"review     {counts['not_current']} finding(s) to re-review at "
+                     f"{summary['target'][:12]} ({_counts(counts['by_area'])}; outcomes "
+                     f"{_counts(counts['by_outcome'])}); {counts['drafts_possible']} with a "
+                     "successor draft possible")
+        for item in summary["first"]:
+            lines.append(f"  {item['rank']:>3}. {_cli._display(item['finding_id']):<24} "
+                         f"{item['freshness']:<13} {item['area']:<10} "
+                         f"{', '.join(item['outcomes']) or '-'}")
+    lines.extend(_batch_lines(summary["batch"]))
+    if summary["next"]:
+        lines.append(f"next       {summary['next']}   (the prioritised re-review list with the "
+                     "old and aligned spans and the exact commands; nothing is approved or "
+                     "rewritten)")
+    return lines
 
 
 # -- review / supersede / retract -------------------------------------------------------------------
@@ -579,6 +837,15 @@ def register(commands: Any, common: argparse.ArgumentParser) -> None:
     verify.add_argument("finding_ids", nargs="*", metavar="ID", help="default: all active findings")
     verify.add_argument("--label", metavar="LABEL",
                         help="only the active findings imported with this source label")
+    verify.add_argument("--pin-cited", action="store_true",
+                        help="first pin every commit the selected findings cite that this store "
+                             "has not pinned (as txray pin: the guarded fetch runs only when the "
+                             "mirror lacks the commit), verify the findings whose citations "
+                             "were unresolved, and re-anchor them again where an earlier check "
+                             "was made from the unresolved citations; freshness only")
+    verify.add_argument("--upstream", metavar="URL", default=None,
+                        help="with --pin-cited: allowlisted repository URL (default: the "
+                             "store's upstream)")
     verify.set_defaults(handler=_cmd_verify)
 
     reanchor = parser(
@@ -598,7 +865,31 @@ def register(commands: Any, common: argparse.ArgumentParser) -> None:
                                "(by committer time)")
     reanchor.add_argument("--strict", action="store_true",
                           help="exit 1 when any finding is not CURRENT at the target")
+    reanchor.add_argument("--summary", action="store_true",
+                          help="print the totals, the first entries of the re-review list and "
+                               "the next commands instead of one line per finding")
     reanchor.set_defaults(handler=_cmd_reanchor)
+
+    stale = parser(
+        "stale", [],
+        help="prioritised re-review list of findings not CURRENT at a commit (read-only)",
+        description=(
+            "List every active finding that is not CURRENT at the target (default: the newest "
+            "pin), parameter findings first, then scoring paths, then the rest. Each entry "
+            "shows the old span, the span the tool located or aligned at the target with its "
+            "SHA-256 and anchor verdict, and the exact commands to read both spans and to "
+            "supersede, review or retract the finding. Nothing is approved and no evidence is "
+            "changed; --spec-dir writes successor drafts (files only) for an author to read."
+        ),
+    )
+    stale.add_argument("--target", metavar="COMMIT", default=None,
+                       help="pinned commit to review at (default: the newest pin)")
+    stale.add_argument("--limit", type=int, default=20, metavar="N",
+                       help="entries printed (default 20; 0 for all; --json lists all)")
+    stale.add_argument("--spec-dir", metavar="DIR", type=_cli.fs_path, default=None,
+                       help="write a successor specification for every entry whose spans were "
+                            "all located or aligned (outside every git working tree)")
+    stale.set_defaults(handler=_cmd_stale)
 
     review = parser(
         "review", [who, writing],

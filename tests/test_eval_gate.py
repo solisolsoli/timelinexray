@@ -9,6 +9,7 @@ as a child process like it does for any client. Nothing is fetched from the netw
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import py_compile
@@ -26,6 +27,9 @@ from tests.templates import copy_upstream_store
 
 EVAL = REPO_ROOT / "eval"
 QUESTIONS = EVAL / "questions.json"
+QUESTIONS_V2 = EVAL / "questions-v2.json"
+#: Revision 1 is immutable: its live runs (eval/live-run-2026-10-0*.txt) were scored with it.
+V1_SHA256 = "e4e451e3c8eb3fe51b8562766b9f092e35d1980118d05aac4c92671d4ef90096"
 GOLDENS = REPO_ROOT / "goldens" / "citations.json"
 UPSTREAM = upstream_git_dir()
 
@@ -47,9 +51,11 @@ live_gate = _load("live_gate")
 class QuestionSetTest(unittest.TestCase):
     """eval/questions.json: citations and abstentions only, no prose, consistent with goldens."""
 
+    PATH = QUESTIONS
+
     @classmethod
     def setUpClass(cls) -> None:
-        cls.data = json.loads(QUESTIONS.read_text("utf-8"))
+        cls.data = json.loads(cls.PATH.read_text("utf-8"))
 
     def test_harness_modules_compile(self) -> None:
         for path in sorted(EVAL.glob("*.py")):
@@ -69,7 +75,7 @@ class QuestionSetTest(unittest.TestCase):
         self.assertIn(UPSTREAM_COMMIT, self.data["commits"]["indexed"])
 
     def test_validate_reports_problems(self) -> None:
-        broken = json.loads(QUESTIONS.read_text("utf-8"))
+        broken = json.loads(self.PATH.read_text("utf-8"))
         broken["items"][0]["kind"] = "guess"
         broken["items"][1]["expected"]["citations"][0]["span_sha256"] = "short"
         broken["items"][1]["expected"]["citations"][0]["anchor"] = "x" * 81
@@ -124,6 +130,183 @@ class QuestionSetTest(unittest.TestCase):
                 self.assertIn("?", item["question"])
                 self.assertNotIn("claim", item)
                 self.assertNotIn("title", item)
+
+
+class QuestionSetV2Test(QuestionSetTest):
+    """eval/questions-v2.json passes every structural check revision 1 passes."""
+
+    PATH = QUESTIONS_V2
+
+
+def _regex_ok(item: dict, answer: str) -> bool:
+    return all(re.search(pattern, answer, re.IGNORECASE | re.DOTALL)
+               for pattern in item["expected"]["answer_regexes"])
+
+
+class SetRevisionTest(unittest.TestCase):
+    """Revision 2 of the question set: revision 1 untouched, every change listed with its
+    reason, and each changed pattern accepts the correct replies v1 rejected while still
+    rejecting wrong ones (synthetic replies written for this test; no model involved)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.v1 = json.loads(QUESTIONS.read_text("utf-8"))
+        cls.v2 = json.loads(QUESTIONS_V2.read_text("utf-8"))
+        cls.items1 = {item["id"]: item for item in cls.v1["items"]}
+        cls.items2 = {item["id"]: item for item in cls.v2["items"]}
+
+    def test_revision_one_is_unchanged_and_named_as_the_base(self) -> None:
+        digest = hashlib.sha256(QUESTIONS.read_bytes()).hexdigest()
+        self.assertEqual(digest, V1_SHA256, "eval/questions.json (revision 1) must never change")
+        self.assertNotIn("revision", self.v1)
+        self.assertEqual(run_gate.revision_number(self.v1), 1)
+        self.assertEqual(self.v1["status"], "root-reviewed 2026-10-01")
+        revision = self.v2["revision"]
+        self.assertEqual(run_gate.revision_number(self.v2), 2)
+        self.assertEqual(revision["base"], {"file": "eval/questions.json", "number": 1,
+                                            "sha256": V1_SHA256,
+                                            "status": "root-reviewed 2026-10-01"})
+        self.assertEqual(self.v2["status"], "root-reviewed 2026-10-07")
+        self.assertIn("unchanged", revision["thresholds"])
+        self.assertEqual(run_gate.DEFAULT_QUESTIONS, QUESTIONS_V2)
+
+    def test_only_listed_items_and_fields_differ(self) -> None:
+        self.assertEqual(list(self.items1), list(self.items2))
+        self.assertEqual(self.v1["commits"], self.v2["commits"])
+        self.assertEqual(set(self.v2) - set(self.v1), {"revision"})
+        listed = {change["id"]: change["fields"] for change in self.v2["revision"]["changes"]}
+        for item_id, old in self.items1.items():
+            new = self.items2[item_id]
+            with self.subTest(item=item_id):
+                fields = listed.get(item_id, [])
+                for key in run_gate.ITEM_KEYS - {"expected"}:
+                    if key not in fields:
+                        self.assertEqual(new[key], old[key])
+                for key in set(old["expected"]) | set(new["expected"]):
+                    if f"expected.{key}" not in fields:
+                        self.assertEqual(new["expected"].get(key), old["expected"].get(key))
+                    else:
+                        self.assertNotEqual(new["expected"][key], old["expected"][key])
+                if item_id not in listed:
+                    self.assertEqual(new, old)
+        self.assertEqual({i for i in listed}, {"Q01", "Q02", "Q03", "Q04", "Q05", "Q15", "Q16",
+                                                "Q17", "Q18", "Q19", "Q20", "Q21", "Q22", "Q25",
+                                                "Q27", "Q29"})
+        for item in self.v2["items"]:
+            if item["kind"] == "abstain":
+                self.assertNotIn(item["id"], listed)
+
+    def test_existing_expected_citations_are_kept(self) -> None:
+        for item_id, old in self.items1.items():
+            if old["kind"] != "answer":
+                continue
+            new = self.items2[item_id]["expected"]["citations"]
+            with self.subTest(item=item_id):
+                self.assertEqual(new[:len(old["expected"]["citations"])],
+                                 old["expected"]["citations"])
+        added = self.items2["Q22"]["expected"]["citations"][1]
+        self.assertEqual((added["path"], added["start_line"], added["end_line"]),
+                         ("under-the-hood/scalding/UthDailyPostsJob.scala", 227, 227))
+
+    def test_q22_second_citation_scores_the_reply_of_the_second_live_run(self) -> None:
+        # the 2026-10-02 reply cited lines 217-232; v1 expected only line 200 (uncited)
+        cited = [{"commit": "77d431aabf40", "start_line": 217, "end_line": 232,
+                  "path": "under-the-hood/scalding/UthDailyPostsJob.scala"}]
+        reply = {"kind": "answer", "reason": "", "citations": cited,
+                 "answer": "The logical id is initialTweetId.getOrElse(tweetId) at 77d431a."}
+        self.assertEqual(live_gate.score(self.items1["Q22"], reply)["category"], "uncited")
+        self.assertEqual(live_gate.score(self.items2["Q22"], reply)["category"], "correct")
+
+    CASES = {
+        # id: (correct replies v1 rejected, wrong replies v2 must still reject)
+        "Q01": (["Thunder, Tweet Mixer, SimClusters, Phoenix, Phoenix Topics, Phoenix MoE and "
+                 "cached posts, in that order."],
+                ["Phoenix, Thunder, Tweet Mixer, SimClusters, Phoenix Topics and cached posts."]),
+        "Q02": (["19 filters; the last two are the FavHoldout and InventoryHoldout filters.",
+                 "Nineteen; it ends with InventoryHoldout and then FavHoldout."],
+                ["18 filters, ending with InventoryHoldoutFilter and FavHoldoutFilter.",
+                 "19 filters, ending with VideoFilter and FavHoldoutFilter."]),
+        "Q03": (["The Phoenix scorer, then the VM ranker."],
+                ["The VM ranker, then the Phoenix scorer."]),
+        "Q04": (["DedupConversationFilter, AncillaryVFFilter and VFFilter.",
+                 "The VF filter, the ancillary VF filter and the dedup conversation filter."],
+                ["AncillaryVFFilter and DedupConversationFilter.",
+                 "VFFilter and DedupConversationFilter."]),
+        "Q05": (["When EnablePhoenixSource is on, the request is not a topic request (or is a "
+                 "bulk topic request), it is not in-network-only and it has no cached posts."],
+                ["When EnablePhoenixSource is on and the request is not a topic request.",
+                 "When the request is not in-network-only and has no cached posts."]),
+        "Q15": (["Its public default is –47.52.", "A public default of negative 47.52."],
+                ["Its public default is 47.52.", "Its public default is -47.5."]),
+        "Q19": (["Its public default is –0.02."], ["Its public default is 0.02."]),
+        "Q20": (["total_sum is the negative sum plus the positive sum."],
+                ["total_sum is the sum of the positive weights only."]),
+        "Q21": (["The share source tweet id must be empty and the post must not be null-cast."],
+                ["The post must not be null-cast."]),
+        "Q22": (["For an edited post the logical id is its initial tweet id.",
+                 "It uses the initial post id."],
+                ["It uses the tweet id of the latest edit."]),
+        "Q25": (["Its public default is 1,200."],
+                ["Its public default is 1,200,000.", "Its public default is 12000.",
+                 "Its public default is 1,100."]),
+        "Q27": (["Its public default is 1,000."],
+                ["Its public default is 10,000.", "Its public default is 1,000.5."]),
+        "Q29": (["The value is 2,800."], ["The value is 2,8000.", "The value is 28,000."]),
+    }
+
+    def test_changed_patterns_accept_correct_and_reject_wrong_replies(self) -> None:
+        for item_id, (correct, wrong) in self.CASES.items():
+            for answer in correct:
+                with self.subTest(item=item_id, answer=answer):
+                    self.assertFalse(_regex_ok(self.items1[item_id], answer), "v1 accepted it")
+                    self.assertTrue(_regex_ok(self.items2[item_id], answer))
+            for answer in wrong:
+                with self.subTest(item=item_id, answer=answer):
+                    self.assertFalse(_regex_ok(self.items2[item_id], answer))
+
+    def test_replies_v1_accepted_are_still_accepted(self) -> None:
+        kept = {
+            "Q01": "thunder_source, tweet_mixer_source, simclusters_source, phoenix_source, "
+                   "phoenix_topics_source, phoenix_moe_source, cached_posts_source",
+            "Q02": "19 filters; the last two are InventoryHoldoutFilter and FavHoldoutFilter.",
+            "Q03": "vec![phoenix_scorer, vm_ranker]",
+            "Q04": "VFFilter, AncillaryVFFilter, DedupConversationFilter",
+            "Q05": "EnablePhoenixSource, not a topic request, !in_network_only, !has_cached_posts",
+            "Q15": "public default -47.52", "Q16": "public default −31.2",
+            "Q17": "public default minus 58.8", "Q18": "public default -234.0",
+            "Q19": "public default -0.02", "Q20": "self.positive_sum() + self.negative_sum()",
+            "Q21": "shareSourceTweetId.isEmpty and !nullcast",
+            "Q22": "initialTweetId.getOrElse(tweetId)", "Q25": "public default 1200",
+            "Q27": "public default 1000", "Q29": "2800",
+        }
+        for item_id, answer in kept.items():
+            with self.subTest(item=item_id):
+                self.assertTrue(_regex_ok(self.items1[item_id], answer))
+                self.assertTrue(_regex_ok(self.items2[item_id], answer))
+
+    def test_validate_checks_the_revision_record(self) -> None:
+        broken = json.loads(QUESTIONS_V2.read_text("utf-8"))
+        broken["revision"]["base"]["number"] = 2
+        broken["revision"]["changes"].append(dict(broken["revision"]["changes"][0]))
+        broken["revision"]["changes"].append({"id": "Q99", "fields": ["expected.citations"],
+                                              "basis": "x", "reason": "y"})
+        broken["revision"]["changes"].append({"id": "Q03", "fields": ["status"],
+                                              "basis": "x", "reason": ""})
+        problems = run_gate.validate(broken)
+        self.assertTrue(any("revision.base" in p for p in problems))
+        self.assertTrue(any("listed twice" in p for p in problems))
+        self.assertTrue(any("Q99: no such item" in p for p in problems))
+        self.assertTrue(any("Q03: fields" in p for p in problems))
+        self.assertTrue(any("Q03: reason" in p for p in problems))
+
+    def test_reports_name_the_revision(self) -> None:
+        report = run_gate.summarize(self.v2, [])
+        self.assertEqual(report["questions"]["revision"], 2)
+        self.assertIn("revision 2; status: root-reviewed 2026-10-07", run_gate.format_report(report))
+        live = live_gate.summarize(self.v1, [])
+        self.assertEqual(live["questions"]["revision"], 1)
+        self.assertIn("revision 1; status: root-reviewed 2026-10-01",
+                      live_gate.format_report(live, []))
 
 
 class LiveScoringTest(unittest.TestCase):
@@ -255,20 +438,24 @@ class DeterministicGateUpstreamTest(unittest.TestCase):
         cls._tmp.cleanup()
 
     def test_every_expected_citation_and_probe_passes(self) -> None:
-        report = run_gate.run(self.store_dir, QUESTIONS)
-        text = run_gate.format_report(report)
-        print(f"\n{text}", file=sys.stderr)
-        self.assertEqual(report["failures"], [])
-        self.assertTrue(report["ok"])
-        checks = report["checks"]
-        for kind in ("span", "hash", "anchor", "value", "get_param", "find_symbols", "probe", "pinned"):
-            with self.subTest(kind=kind):
-                self.assertGreater(checks[kind]["total"], 0)
-                self.assertEqual(checks[kind]["passed"], checks[kind]["total"])
-        self.assertEqual(checks["span"]["total"], report["questions"]["citations"])
-        self.assertEqual(checks["probe"]["total"], report["questions"]["probes"])
-        self.assertTrue(any(re.search(r"\d+ lexically indexed files", scope)
-                            for scope in report["search_scope"]))
+        for path, citations in ((QUESTIONS, 49), (QUESTIONS_V2, 50)):
+            with self.subTest(questions=path.name):
+                report = run_gate.run(self.store_dir, path)
+                text = run_gate.format_report(report)
+                print(f"\n{text}", file=sys.stderr)
+                self.assertEqual(report["failures"], [])
+                self.assertTrue(report["ok"])
+                checks = report["checks"]
+                for kind in ("span", "hash", "anchor", "value", "get_param", "find_symbols",
+                             "probe", "pinned"):
+                    with self.subTest(kind=kind):
+                        self.assertGreater(checks[kind]["total"], 0)
+                        self.assertEqual(checks[kind]["passed"], checks[kind]["total"])
+                self.assertEqual(report["questions"]["citations"], citations)
+                self.assertEqual(checks["span"]["total"], report["questions"]["citations"])
+                self.assertEqual(checks["probe"]["total"], report["questions"]["probes"])
+                self.assertTrue(any(re.search(r"\d+ lexically indexed files", scope)
+                                    for scope in report["search_scope"]))
 
     def test_main_exit_codes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

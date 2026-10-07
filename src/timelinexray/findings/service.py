@@ -427,11 +427,12 @@ class FindingsMemory:
             report[key] = dict(sorted(report[key].items()))
         report["hint"] = None
         if report["unpinned_commits"]:
-            commits = " ".join(report["unpinned_commits"])
+            # one command: `txray pin` takes one commit, so a list of pins plus a verify was
+            # several steps (and an easy-to-mistype command line)
             report["hint"] = (
-                f"{sum(report['unpinned_commits'].values())} citation(s) name commits this "
-                f"store has not pinned; to resolve them: txray pin {commits}; then "
-                f"txray findings verify --label {label}"
+                f"{sum(report['unpinned_commits'].values())} citation(s) name "
+                f"{len(report['unpinned_commits'])} commit(s) this store has not pinned; to "
+                f"resolve them in one step: txray findings verify --pin-cited --label {label}"
             )
         report["head"] = self.ledger.verify().last_hash
         return report

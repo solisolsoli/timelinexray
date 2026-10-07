@@ -57,7 +57,7 @@ TimelineXray makes every statement about that code checkable:
 | **Native code index** | Lexical search, symbols and unresolved call candidates for Rust, Scala, Python and Java on SQLite FTS5: 2,147 files and 50,387 symbols at `77d431a`. |
 | **Parameter tools** | `txray param` and `txray param-history` find declarations and their public defaults and trace value changes across pinned commits, both sides cited. |
 | **Findings memory** | A hash-chained ledger of claims whose every citation is a byte span; re-anchoring marks changed evidence `STALE`; only a different reviewer can confirm a claim. |
-| **Change digests** | `txray diff`, `digest` and `update` classify what changed between two commits from the diff itself (never from commit messages) and list the findings it touches. |
+| **Change digests** | `txray diff`, `digest` and `update` classify what changed between two commits from the diff itself (never from commit messages) and list the findings it touches: a short main digest (summary, parameter defaults, registrations, scoring changes, with citations), an appendix with every other item, and the complete JSON. |
 | **Read-only MCP server** | Twelve tools over stdio (`search_code`, `read_span`, `find_symbols`, `get_param`, `param_history`, `verify_claim`, ...) so agents cite instead of guess. |
 | **Offline creator metrics** | `txray metrics` computes descriptive metrics from *your own* analytics export in a network-disabled process. Never a reach prediction. |
 | **Context Layer export** | Optional: write current findings as Markdown notes with permalinks and `[[wikilinks]]` for a [Context Layer](https://github.com/solisolsoli/context-layer) or Obsidian vault. |
@@ -211,11 +211,15 @@ Version `0.10.0`, alpha: all six milestones are implemented (evidence foundation
 index, findings memory, read-only MCP server, change digests and offline metrics, release
 hardening), plus the fixes of an end-to-end audit. Interfaces may change before 1.0.
 
-Quality is measured, not asserted. `make ci` runs 704 tests against the real upstream, and the CI
+Quality is measured, not asserted. `make ci` runs 823 tests against the real upstream, and the CI
 workflow runs it on Linux and macOS for Python 3.11, 3.12 and 3.13. The semantic release gate (40 reviewed questions answered by
 an agent through the MCP tools, scored by rule) **has not passed yet**: the second live run
 (2026-10-02) reached precision 29/31 = 0.935 against a 0.95 threshold, coverage 29/31,
-abstention 9/9 and 51/51 intact citations (first run: precision 27/30, abstention 5/9). The numbers, the analysis and the
+abstention 9/9 and 51/51 intact citations (first run: precision 27/30, abstention 5/9). Revision 2
+of the set (`eval/questions-v2.json`, root-reviewed 2026-10-07) corrects the expected answers that
+rejected correct replies; its live run (2026-10-07) answered all 31 answer items correctly
+(precision 31/32 = 0.969, coverage 31/31, 53/53 intact citations) but missed two of the nine
+abstention items (7/9), so the gate still fails; revision 1 and its results are unchanged. The numbers, the analysis and the
 next steps are in [docs/release-checklist.md](docs/release-checklist.md#3a-semantic-release-gate-audit-section-6-item-5-p7-sections-71-73).
 Every known limit is listed in [docs/limits.md](docs/limits.md).
 
@@ -256,12 +260,14 @@ txray findings add --actor author-1 --title "..." --claim "..." --evidence-class
     --status SUPPORTED --cite 77d431a xai-value-model/scoring.rs 65-119 compute_weighted_score
 txray findings verify F-...        # span integrity only (INTACT / CHANGED / MISSING)
 txray findings reanchor <newer-commit>   # freshness only: CURRENT / STALE / UNVERIFIABLE
+txray findings stale               # what to re-review first: old and aligned spans, exact commands
+txray findings verify --pin-cited  # pin the commits imported citations name, re-verify, re-anchor
 txray findings review F-... --actor reviewer-1 --role reviewer --status SUPPORTED --rationale "..."
 txray findings verify-log          # hash chain and HEAD
 
 # Classified changes and a reviewed digest between two pinned commits (nothing is posted)
 txray diff   4c5cfe8 a707cc2 --class parameter-default
-txray digest 4c5cfe8 a707cc2 --out ~/txray-digests --format md   # --ledger DIR for affected findings
+txray digest 4c5cfe8 a707cc2 --out ~/txray-digests   # main digest + appendix; --ledger DIR for affected findings
 txray update --out ~/txray-digests   # guarded fetch + pin + digest; schedule it yourself
 txray update --out ~/txray-digests --reanchor --export ~/vault/txray
     # also re-anchors the ledger on the new head and refreshes the notes

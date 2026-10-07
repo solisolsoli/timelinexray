@@ -17,6 +17,7 @@ failed or attention needed, 2 invalid arguments, 3 network refused). Registered 
 from __future__ import annotations
 
 import argparse
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -25,15 +26,16 @@ from .diff import CLASSES, ChangeItem, CommitDiff, DiffEngine, SymbolSource
 from .diff.model import Citation
 from .digest import (
     AffectedFindingsProvider,
+    FORMATS,
     DigestBuilder,
     default_findings_provider,
-    digest_filename,
-    digest_json,
-    render_markdown,
+    render_digest,
+    write_digests,
 )
+from .digest.build import digest_summary
 from .digest.update import FAILED, NO_CHANGE, run_update
 from .findings import ledger_directory
-from .fsutil import atomic_write, check_output_directory
+from .fsutil import check_output_directory
 from .index import CodeIndex
 from .netguard import DEFAULT_UPSTREAM_URL, ENV_ALLOW_FILE_URLS, Allowlist
 from .snapshot.store import SnapshotStore
@@ -127,52 +129,68 @@ def _cmd_digest(args: argparse.Namespace) -> int:
     builder = DigestBuilder(store, allowlist=Allowlist.from_env(), findings=findings,
                             symbols=_symbols(args))
     document = builder.build(args.old, args.new)
-    text = render_markdown(document) if args.format == "md" else digest_json(document)
     if out_dir is None:
         if args.json:
             _cli._emit_json("digest", {"outcome": "ok", "data": document, "warnings": []})
         else:
-            _cli._write(text)
+            _cli._write(render_digest(document, args.format))
         return 0
-    out_dir.mkdir(exist_ok=True)
-    name = digest_filename(document, args.format)
-    atomic_write(out_dir / name, text.encode("utf-8"))
-    summary = _digest_summary(document)
+    written = write_digests(out_dir, document, (args.format,))  # md brings its appendix
+    summary = digest_summary(document)
     if args.json:
-        _cli._emit_json("digest", {"outcome": "ok", "data": {"written": [name], **summary},
+        _cli._emit_json("digest", {"outcome": "ok", "data": {"written": written, **summary},
                                    "warnings": []})
     else:
-        _cli._write(f"wrote      {out_dir / name}\n" + _format_summary(summary))
+        _cli._write("".join(f"wrote      {out_dir / name}\n" for name in written)
+                    + _format_summary(summary))
     return 0
 
 
-def _digest_summary(document: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "range": {key: document["range"][key] for key in ("relationship", "commits_in_range",
-                                                          "history_complete")},
-        "old": document["range"]["old"]["commit"],
-        "new": document["range"]["new"]["commit"],
-        "items_by_class": document["summary"]["net"]["items_by_class"],
-        "parameter_changes": len(document["parameters"]["net"]),
-        "events": document["events"],
-        "inputs_sha256": document["inputs_sha256"],
-    }
-
-
-def _format_summary(summary: dict[str, Any]) -> str:
+def _format_summary(summary: dict[str, Any], *, events: bool = True) -> str:
     classes = ", ".join(f"{k} {v}" for k, v in summary["items_by_class"].items() if v) or "none"
+    reasons = ", ".join(f"{k} {v}" for k, v in summary.get("unknown_reasons", {}).items())
     lines = [
         f"range      {summary['old'][:12]}..{summary['new'][:12]} "
         f"({summary['range']['relationship']}, {summary['range']['commits_in_range']} commits)",
         f"items      {classes}",
-        f"parameters {summary['parameter_changes']} public-default changes",
+        f"parameters {summary['parameter_changes']} public-default changes; "
+        f"{summary.get('registration_changes', 0)} registration changes",
     ]
-    for event in summary["events"]:
-        lines.append(f"event      {event['kind']} ({event['severity']}): {event['message']}")
+    if reasons:
+        lines.append(f"unknown    {reasons} (listed with citations in the appendix)")
+    if events:
+        for event in summary["events"]:
+            lines.append(f"event      {event['kind']} ({event['severity']}): {event['message']}")
     return "\n".join(lines) + "\n"
 
 
 # -- update --------------------------------------------------------------------------------
+
+
+ADDED_SHOWN = 10
+
+
+def _stale_lines(args: argparse.Namespace, refresh: Any) -> list[str]:
+    """The stale-review counts and next commands after ``update --reanchor``."""
+    summary = refresh.stale_review
+    if not summary:
+        return []
+    counts = summary["counts"]
+    where = [*(["--store", str(args.store)] if args.store else []),
+             *(["--ledger", str(args.ledger)] if args.ledger else [])]
+    lines = []
+    if counts["not_current"]:
+        areas = ", ".join(f"{k} {v}" for k, v in counts["by_area"].items())
+        lines.append(f"review     {counts['not_current']} finding(s) not current at the head "
+                     f"({areas}): "
+                     + shlex.join(["txray", "findings", "stale", "--target",
+                                   refresh.target[:12], *where]))
+    for step in summary["batch"]:
+        if "commits" in step:
+            lines.append(f"unpinned   {len(step['findings'])} finding(s) cite "
+                         f"{len(step['commits'])} unpinned commit(s): "
+                         + shlex.join(["txray", "findings", "verify", "--pin-cited", *where]))
+    return lines
 
 
 def _cmd_update(args: argparse.Namespace) -> int:
@@ -216,6 +234,8 @@ def _cmd_update(args: argparse.Namespace) -> int:
     for name in result.written:
         lines.append(f"wrote      {Path(args.out) / name}")
     lines.append(f"status     {Path(args.out) / 'update-status.json'}")
+    if result.digest is not None:
+        lines += _format_summary(result.digest, events=False).splitlines()[1:]
     for event in result.events:
         lines.append(f"event      {event.kind} ({event.severity}): {event.message}")
     if refresh is not None:
@@ -224,10 +244,15 @@ def _cmd_update(args: argparse.Namespace) -> int:
                      f"({refresh.selection}): {counts}")
         lines.append(f"queue      {refresh.queue_before} -> {refresh.queue_after} open item(s); "
                      f"{len(refresh.added)} new, {len(refresh.removed)} closed")
-        for item in refresh.added:
+        # the new items in the stale-review order (parameter, scoring, other), first ten only
+        for item in refresh.added[:ADDED_SHOWN]:
             scope = f" @ {str(item['scope'])[:12]}" if item.get("scope") else ""
             lines.append(f"           P{item['priority']} {item['trigger']:<22} "
                          f"{_cli._display(str(item['finding_id']))}{scope}")
+        if len(refresh.added) > ADDED_SHOWN:
+            lines.append(f"           ... and {len(refresh.added) - ADDED_SHOWN} more "
+                         "(update-status.json lists every one)")
+        lines.extend(_stale_lines(args, refresh))
     if result.export is not None:
         if result.export.get("failed"):
             lines.append(f"export     failed: {result.export['message']}")
@@ -238,8 +263,10 @@ def _cmd_update(args: argparse.Namespace) -> int:
                          f"current, {found['not_current']} not current): {files['written']} "
                          f"written, {files['unchanged']} unchanged, {files['removed']} removed")
     if refresh is not None and refresh.added:
-        lines.append(f"next       txray findings queue   ({len(refresh.added)} new review "
-                     "item(s) appeared in this run)")
+        lines.append(f"next       txray findings stale   ({len(refresh.added)} new review "
+                     "item(s) appeared in this run; the review line above has the full command, "
+                     "with the old and aligned spans and the re-review commands; txray findings "
+                     "queue lists the items by trigger)")
     elif refresh is None and result.head and result.outcome not in (NO_CHANGE, FAILED):
         # a new pin makes every finding checked only at older pins "not current" until
         # the ledger is re-anchored on it (docs/findings-memory.md, "Current")
@@ -284,9 +311,12 @@ def register(commands: Any, common: argparse.ArgumentParser) -> None:
     )
     digest.add_argument("old", help="pinned commit id or unique prefix (7+ digits)")
     digest.add_argument("new", help="pinned commit id or unique prefix (7+ digits)")
-    digest.add_argument("--out", metavar="DIR", type=_cli.fs_path, help="write digest-<old>-<new>.<ext> into DIR")
-    digest.add_argument("--format", choices=("md", "json"), default="md",
-                        help="md (default) or json")
+    digest.add_argument("--out", metavar="DIR", type=_cli.fs_path,
+                        help="write digest-<old>-<new>.md and its -appendix.md (or .json) into DIR")
+    digest.add_argument("--format", choices=FORMATS, default="md",
+                        help="md (default: the bounded main digest; with --out also its "
+                             "appendix), appendix (every item the main digest only counts) or "
+                             "json (the complete document)")
     digest.add_argument("--ledger", metavar="DIR", default=None, type=_cli.fs_path,
                         help="findings ledger read (never written) for the affected-findings "
                              "section (default: $TXRAY_FINDINGS or <store>/findings)")

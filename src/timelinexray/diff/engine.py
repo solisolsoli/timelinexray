@@ -11,7 +11,7 @@ Classification of one changed file (first matching rule wins for the whole file)
    when the manifest says generated/vendored, else ``unknown`` ("not compared as text").
 2. Every existing side has a path class -> that class for the whole file: ``license``
    (license/notice file names), ``generated-vendored`` (manifest reason), ``docs-only``,
-   ``test-only``.
+   ``test-only``, ``build-dependency`` (build-system and dependency files).
 3. Otherwise the content decides, per item:
 
    * ``parameter-default`` - a ``param!`` declaration, const/static, literal field or
@@ -20,8 +20,11 @@ Classification of one changed file (first matching rule wins for the whole file)
      or reordered (or such a list added or removed);
    * each remaining hunk: ``cosmetic`` when the comment- and whitespace-insensitive
      tokens of both sides are equal; ``test-only`` inside test code; ``license`` when every
-     changed line is license header text; else ``scoring-logic``, ``model-config`` or
-     ``unknown`` from path and symbol names (:func:`timelinexray.diff.rules.logic_class`).
+     changed line is license header text; ``build-dependency`` when every changed code line
+     is an import or bodyless module declaration; else ``scoring-logic``,
+     ``model-config`` or ``unknown`` from path and symbol names
+     (:func:`timelinexray.diff.rules.logic_class`). An ``unknown`` item records why in
+     ``detail.unknown_reason``.
 
 Adjacent hunks of the same class inside the same symbol form one item. Every item cites an
 exact span on each side, read with :func:`timelinexray.span.read_span` from the blob bytes.
@@ -55,17 +58,19 @@ from .model import (
     Hunk,
 )
 from .rules import (
+    BUILD_DEPENDENCY,
     CLASSIFIER_VERSION,
     COSMETIC,
     GENERATED_VENDORED,
     LICENSE,
+    NATIVE_LANGUAGES,
     PARAMETER_DEFAULT,
     REGISTRATION,
     TEST_ONLY,
     UNKNOWN,
     class_rank,
     is_key_value_config,
-    logic_class,
+    logic_match,
     path_class,
 )
 from .symbols import FileSymbols, SymbolSource
@@ -460,7 +465,8 @@ class _FileContext:
             return [_Builder(cls, "file", self._file_summary("not compared as text: "
                                                                + change.analysis[len("not-text:"):]),
                              self.side_citation("old", [], whole=True),
-                             self.side_citation("new", [], whole=True))]
+                             self.side_citation("new", [], whole=True),
+                             {"unknown_reason": "not-text"} if cls == UNKNOWN else {})]
         sides = [(e.path, e.reason) for e in (self.old_entry, self.new_entry) if e is not None]
         path_classes = [path_class(path, reason) for path, reason in sides]
         if all(cls is not None for cls in path_classes):
@@ -497,7 +503,8 @@ class _FileContext:
             text = f"file mode changed {change.old_mode} -> {change.new_mode}; content unchanged"
         return _Builder(cls, kind, self._file_summary(text),
                         self.side_citation("old", [], whole=True),
-                        self.side_citation("new", [], whole=True))
+                        self.side_citation("new", [], whole=True),
+                        {"unknown_reason": "mode-only"} if cls == UNKNOWN else {})
 
     def _attribute(self, side: str, hunks: list[Hunk]) -> tuple[str, ...]:
         view = self.old_view if side == "old" else self.new_view
@@ -652,8 +659,9 @@ class _FileContext:
                 new_cov.update(range(builder.new_span[0], builder.new_span[1] + 1))
         old_a = self.old_view.analysis if self.old_view else None
         new_a = self.new_view.analysis if self.new_view else None
-        regions: list[tuple[str, Hunk, str | None]] = []
+        regions: list[tuple[str, Hunk, str | None, tuple[str, str] | None]] = []
         for hunk in self.hunks:
+            match: tuple[str, str] | None = None
             old_lines, new_lines = list(hunk.old_lines), list(hunk.new_lines)
             touched = bool(old_cov.intersection(old_lines) or new_cov.intersection(new_lines))
             rest_old = [line for line in old_lines if line not in old_cov]
@@ -670,19 +678,30 @@ class _FileContext:
                 cls = TEST_ONLY
             elif self._license_lines(old_a, old_lines, new_a, new_lines):
                 cls = LICENSE
+            elif self._declarations_only(old_a, old_lines, new_a, new_lines):
+                cls = BUILD_DEPENDENCY
             else:
                 names = self._attribute("old", [hunk]) + self._attribute("new", [hunk])
-                cls = logic_class(self.paths, names)
-            regions.append((cls, hunk, self._group_symbol(hunk)))
+                cls, rule, matched = logic_match(self.paths, names)
+                if rule is not None and matched is not None:
+                    match = (rule, matched)
+            regions.append((cls, hunk, self._group_symbol(hunk), match))
         builders: list[_Builder] = []
         group: list[Hunk] = []
+        group_matches: list[tuple[str, str]] = []
         current: tuple[str, str | None] | None = None
-        for cls, hunk, symbol in regions + [("", Hunk(0, 0, 0, 0), None)]:
+        for cls, hunk, symbol, match in regions + [("", Hunk(0, 0, 0, 0), None, None)]:
             if current is not None and (cls, symbol) != current:
-                builders.append(self._region_builder(current[0], group))
-                group = []
+                builder = self._region_builder(current[0], group)
+                if group_matches:  # which name rule decided a logic class, in hunk order
+                    builder.detail["matched_by"] = [{"rule": rule, "name": name} for rule, name
+                                                    in dict.fromkeys(group_matches)]
+                builders.append(builder)
+                group, group_matches = [], []
             current = (cls, symbol)
             group.append(hunk)
+            if match is not None:
+                group_matches.append(match)
         return builders
 
     def _group_symbol(self, hunk: Hunk) -> str | None:
@@ -711,6 +730,32 @@ class _FileContext:
         texts = [text for text in texts if text.strip()]
         return bool(texts) and all(_LICENSE_LINE.search(text) for text in texts)
 
+    @staticmethod
+    def _declarations_only(old_a: BlobAnalysis | None, old_lines: list[int],
+                           new_a: BlobAnalysis | None, new_lines: list[int]) -> bool:
+        """Every changed code line on both sides is an import or bodyless module declaration
+        (and at least one side has such a line)."""
+        verdicts = []
+        for analysis, lines in ((old_a, old_lines), (new_a, new_lines)):
+            if not lines:
+                continue
+            if analysis is None:
+                return False
+            verdict = analysis.only_declarations(lines)
+            if verdict is False:
+                return False
+            verdicts.append(verdict)
+        return any(verdict is True for verdict in verdicts)
+
+    def _unknown_reason(self) -> str:
+        """Why a text region stayed ``unknown``: ``no-rule`` when its language is parsed
+        (symbols, values and lists were read and no rule matched), else ``not-parsed`` (only
+        path and token rules could apply)."""
+        for view in (self.new_view, self.old_view):
+            if view is not None and view.analysis.language in NATIVE_LANGUAGES:
+                return "no-rule"
+        return "not-parsed"
+
     def _region_builder(self, cls: str, hunks: list[Hunk]) -> _Builder:
         old_symbols = self._attribute("old", hunks)
         new_symbols = self._attribute("new", hunks)
@@ -723,6 +768,8 @@ class _FileContext:
             text = "test code"
         elif cls == LICENSE:
             text = "license header lines"
+        elif cls == BUILD_DEPENDENCY:
+            text = "import or module declarations"
         else:
             text = "code or configuration"
         if self.change.status in (ADDED, REMOVED):
@@ -732,9 +779,10 @@ class _FileContext:
                        f"-{removed} +{added} lines in {where}")
             if self.change.status == RENAMED:
                 summary += f" (renamed from {self.change.old_path}, {self.change.similarity}% similar)"
+        detail = {"unknown_reason": self._unknown_reason()} if cls == UNKNOWN else {}
         return _Builder(cls, "region", summary,
                         self.side_citation("old", hunks), self.side_citation("new", hunks),
-                        {}, old_symbols, new_symbols, hunks=list(hunks))
+                        detail, old_symbols, new_symbols, hunks=list(hunks))
 
 
 def _same_tokens(old_a: BlobAnalysis | None, old_lines: list[int],

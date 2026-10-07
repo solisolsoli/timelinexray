@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import tempfile
 import unittest
@@ -18,13 +19,15 @@ from timelinexray.digest import (
     NullFindingsProvider,
     default_findings_provider,
     digest_json,
+    render_appendix,
     render_markdown,
 )
+from timelinexray.digest.render import digest_names
 from timelinexray.errors import NetworkRefused
 from timelinexray.mcp.guard import ANALYTICS_DATASET_FILE, ANALYTICS_DATASET_FORMAT
 from timelinexray.netguard import ENV_ALLOW_FILE_URLS, Allowlist
 from timelinexray.snapshot import SnapshotStore
-from tests.diff_support import MISLEADING_MESSAGE, range_history
+from tests.diff_support import CLASSES_NEW, CLASSES_OLD, MISLEADING_MESSAGE, linear_history, range_history
 from tests.support import REPO_ROOT, file_url, run_cli
 
 TMP: tempfile.TemporaryDirectory
@@ -169,6 +172,101 @@ class RangeDigestTest(unittest.TestCase):
         self.assertNotEqual(doc["inputs_sha256"], self.doc["inputs_sha256"])
 
 
+class DigestLayoutTest(unittest.TestCase):
+    """The main digest is summary-first and bounded; main + appendix list every item; the
+    JSON overview agrees with the items (synthetic CLASSES fixture: every class occurs)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.tmp = tempfile.TemporaryDirectory(prefix="txray-digest-layout-")
+        root = Path(cls.tmp.name)
+        git_dir, commits = linear_history(root, [CLASSES_OLD, CLASSES_NEW])
+        url = file_url(git_dir)
+        store = SnapshotStore(root / "store")
+        for commit in commits:
+            store.pin(commit, url, allowlist=Allowlist([url]))
+        cls.doc = DigestBuilder(store, allowlist=Allowlist([url])).build(*commits)
+        cls.md = render_markdown(cls.doc)
+        cls.appendix = render_appendix(cls.doc)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.tmp.cleanup()
+
+    def test_summary_first(self) -> None:
+        headings = [line for line in self.md.splitlines() if line.startswith("## ")]
+        self.assertEqual(headings[:4], ["## At a glance", "## What to check next", "## Statements",
+                                        "## Parameter default changes"])
+        self.assertLess(self.md.index("## Weight/scoring logic change"), self.md.index("## Summary by class"))
+        for statement in STATEMENTS:
+            self.assertIn(statement, self.md)
+            self.assertIn(statement, self.appendix)
+        main, appendix, data = digest_names(self.doc)
+        self.assertIn(f"`{appendix}`", self.md)
+        self.assertIn(f"`{data}`", self.md)
+        self.assertIn(f"`{main}`", self.appendix)
+
+    def test_every_item_is_cited_in_the_main_file_or_the_appendix(self) -> None:
+        tables = {"parameter-default", "registration"}
+        for item in self.doc["items"]:
+            with self.subTest(item=item["id"], cls=item["class"]):
+                where = self.md if item["class"] == "scoring-logic" else self.appendix
+                if item["class"] in tables:
+                    where = self.md
+                for side in ("old", "new"):
+                    sha = item[side].get("span_sha256")
+                    if sha:
+                        self.assertIn(sha, where)
+                if item["class"] == "unknown":
+                    self.assertIn(f"reason `{item['detail']['unknown_reason']}`", self.appendix)
+        # the main file lists the logic classes; the appendix does not repeat them
+        self.assertNotIn("## Weight/scoring logic change", self.appendix)
+        self.assertIn("## Unknown / unresolved change (`unknown`)", self.appendix)
+        self.assertIn("## Unresolved and unknown changes", self.md)
+
+    def test_overview_agrees_with_the_items(self) -> None:
+        rows = {row["class"]: row for row in self.doc["overview"]["classes"]}
+        net = self.doc["summary"]["net"]["items_by_class"]
+        for name, row in rows.items():
+            with self.subTest(name):
+                self.assertEqual(row["items"], net[name])
+                self.assertEqual(sum(area["items"] for area in row["areas"]), row["items"])
+                self.assertEqual(row["listed_in"], "main" if name in (
+                    "parameter-default", "registration", "scoring-logic") else "appendix")
+        self.assertEqual(rows["scoring-logic"]["decided_by"], {"path": 1})
+        self.assertEqual(sum(rows["unknown"]["reasons"].values()), rows["unknown"]["items"])
+        for entry in self.doc["classes"]:
+            self.assertTrue(entry["must_not_be_read_as"])
+
+    def test_row_budgets_bound_the_main_file_and_move_rows_to_the_appendix(self) -> None:
+        doc = copy.deepcopy(self.doc)
+        [row] = [r for r in doc["parameters"]["net"] if r["name"] == "ClickWeight"]
+        doc["parameters"]["net"] = [dict(row, name=f"Weight{n:03d}") for n in range(200)]
+        scoring = [item for item in doc["items"] if item["class"] == "scoring-logic"][0]
+        doc["items"] += [dict(scoring, new_path=f"scorers/s{n:03d}.rs", id=f"i-{n:016x}")
+                         for n in range(300)]
+        doc.pop("overview")  # recomputed from the items by the renderer
+        md, appendix = render_markdown(doc), render_appendix(doc)
+        self.assertIn("140 more parameter default changes are in", md)
+        self.assertIn("Cut from this file for size (all in the appendix): 140 of 200 parameter "
+                      "default rows", md)
+        self.assertNotIn("`Weight060`", md)
+        self.assertIn("`Weight199`", appendix)
+        self.assertIn("## Parameter default changes, continued", appendix)
+        self.assertIn("counted by file here", md)
+        self.assertIn("`scorers/s299.rs`", appendix)
+        self.assertLess(len(md.encode()), 60_000)
+        self.assertEqual(render_markdown(doc), md)  # deterministic
+
+    def test_compact_citations_keep_commit_lines_and_hash(self) -> None:
+        [scoring] = [item for item in self.doc["items"] if item["class"] == "scoring-logic"]
+        old, new = scoring["old"], scoring["new"]
+        self.assertIn(f"L{old['start_line']} `{old['span_sha256']}`", self.md)
+        self.assertIn(f"(at `{old['commit'][:12]}`)", self.md)
+        self.assertIn(f"(at `{new['commit'][:12]}`)", self.md)
+        self.assertIn("A citation reads `commit` L<first>-L<last> `span SHA-256`", self.md)
+
+
 class OtherRangesTest(unittest.TestCase):
     def test_reversed_range_is_flagged_and_tree_only(self) -> None:
         store = _store("store-reversed", [COMMITS[0], COMMITS[-1]])
@@ -216,8 +314,12 @@ class DigestCommandTest(unittest.TestCase):
                                 "--json", *args], env)
         envelope = json.loads(out)
         self.assertEqual((code, envelope["command"], envelope["data"]["written"]),
-                         (0, "digest", [written.name.replace(".json", ".md")]))
+                         (0, "digest", [written.name.replace(".json", ".md"),
+                                        written.name.replace(".json", "-appendix.md")]))
         self.assertTrue((out_dir / written.name.replace(".json", ".md")).is_file())
+        appendix = out_dir / written.name.replace(".json", "-appendix.md")
+        code, out, _ = run_cli(["digest", COMMITS[0], COMMITS[-1], "--format", "appendix", *args], env)
+        self.assertEqual((code, out), (0, appendix.read_bytes()))
         code, _, err = run_cli(["digest", COMMITS[0], "0" * 40, *args], env)
         self.assertEqual(code, 1)
 
@@ -270,7 +372,9 @@ class DigestCommandTest(unittest.TestCase):
         self.assertEqual(elsewhere.read_text("utf-8"), "# keep\n")
         self.assertFalse((out / name).is_symlink())
         self.assertTrue((out / name).read_text("utf-8").startswith("# Change digest"))
-        self.assertEqual([p.name for p in out.iterdir()], [name])  # no temporary file left
+        # no temporary file left; the main digest brings its appendix
+        self.assertEqual(sorted(p.name for p in out.iterdir()),
+                         sorted([name, name.replace(".md", "-appendix.md")]))
 
 
 if __name__ == "__main__":

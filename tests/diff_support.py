@@ -234,6 +234,9 @@ CLASSES_OLD: dict[str, bytes] = {
     "svc/handler.rs": HANDLER_OLD,
     "assets/blob.bin": b"\x00\x01binary\x00",
     "gone/removed.rs": b"pub fn removed() {}\n",
+    "visibility/rules.rs": b"pub fn hide(flags: u8) -> bool {\n    flags > 2\n}\n",
+    "svc/BUILD.bazel": b'rust_library(name = "svc", deps = [":a"])\n',
+    "svc/wiring.rs": b"use crate::a::Alpha;\n\npub fn wire() -> u8 {\n    1\n}\n",
 }
 
 CLASSES_NEW: dict[str, bytes] = {
@@ -254,6 +257,9 @@ CLASSES_NEW: dict[str, bytes] = {
     "svc/request_handler.rs": HANDLER_OLD.replace(b"User::new(id)", b"User::load(id)"),
     "assets/blob.bin": b"\x00\x02binary\x00",
     "added/fresh.rs": b"pub fn fresh() -> u8 {\n    1\n}\n",
+    "visibility/rules.rs": b"pub fn hide(flags: u8) -> bool {\n    flags > 3\n}\n",
+    "svc/BUILD.bazel": b'rust_library(name = "svc", deps = [":a", ":b"])\n',
+    "svc/wiring.rs": b"use crate::a::{Alpha, Beta};\n// wiring\n\npub fn wire() -> u8 {\n    1\n}\n",
 }
 
 

@@ -95,8 +95,9 @@ class UpstreamDigestTest(unittest.TestCase):
                                                 c["end_line"], anchor=f"ClickWeight, f64, "
                                                 f"\"rust_home_mixer_click_weight\", {value}")
                     self.assertEqual((span.sha256, span.anchor.verdict), (c["span_sha256"], "FOUND"))
-                line = (f"| `ClickWeight` | `{row['path']}` | param! | value changed | "
-                        f"public default `0.4` → `0.3` |")
+                line = (f"| `ClickWeight` | `{row['path']}` | public default `0.4` → `0.3` "
+                        f"(param!) | L{row['old']['start_line']} `{row['old']['span_sha256']}` | "
+                        f"L{row['new']['start_line']} `{row['new']['span_sha256']}` |")
                 self.assertIn(line, md)
         # P4 ground truth for this step: the home-mixer copy moved from line 322 to 329.
         home = next(row for row in rows if row["path"] == PARAMETER_FILES[0])

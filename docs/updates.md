@@ -64,7 +64,9 @@ link at a digest's name is replaced, never followed.
 ## Classes
 
 A class names what the rule saw; it is not a reviewed interpretation. One file can yield
-items of several classes. Rules, in order:
+items of several classes. Rules, in order (classifier version 2; version 1 had no
+`build-dependency`, no `train` location or test helper names, and its `unknown` items
+carried no reason):
 
 | Class | Rule | Must not be read as |
 | --- | --- | --- |
@@ -72,13 +74,26 @@ items of several classes. Rules, in order:
 | `license` | a license or notice file (`LICENSE*`, `NOTICE*`, `COPYING*`, ...), or a hunk whose every changed line is license header text | a determination of the applicable license |
 | `generated-vendored` | the manifest says `generated` or `vendored` | reviewed upstream code |
 | `docs-only` | documentation files (`.md`, `.rst`, `.txt`, `docs/`, `README*`, ...) | a change of behaviour |
-| `test-only` | test files (`tests/`, `golden_corpus/`, `*_test.rs`, `test_*.py`, `*Test.java`, ...), or hunks entirely inside test code (Rust `#[cfg(test)]` modules and `#[test]` functions, Java `@Test` methods, Python `test_*`/`Test*`) | a change of production code |
+| `test-only` | test files (`tests/`, `golden_corpus/`, `*_test.rs`, `test_*.py`, `*Test.java`, `test_support.*`, `test_helpers.*`, `*_fixtures.*`, ...), or hunks entirely inside test code (Rust `#[cfg(test)]` modules and `#[test]` functions, Java `@Test` methods, Python `test_*`/`Test*`) | a change of production code |
+| `build-dependency` | a build-system or dependency file by name (`BUILD`, `*.bazel`, `*.bzl`, `WORKSPACE`, `Cargo.toml`, `build.rs`, `pyproject.toml`, `setup.py`, `requirements*.txt`, `package.json`, `Makefile`, `CMakeLists.txt`, `Dockerfile`, `pom.xml`, `build.gradle`, `build.sbt`, `go.mod`, ...), or a hunk whose every changed code line lies in a Milestone 2 `import` symbol (Rust `use`/`extern crate`, Java, Scala and Python imports) or a bodyless `module` symbol (`mod name;`, a `package` clause); blank and comment-only lines may accompany them | that behaviour is unchanged: an import can change name resolution and a dependency version can change behaviour |
 | `parameter-default` | the value of a `param!(Name, type, "flag", value)` declaration, a `const`/`static` or Java `static final` with a literal value, a literal Java/Scala field, a Python `UPPER_CASE` constant with a literal value, or a key of a YAML/TOML/INI/JSON config file differs between the two cited declarations; `param!` declarations added or removed | a production value: every value is a **public default** at its commit |
 | `registration` | entries of a list that registers components were added, removed or reordered, or such a list appeared or disappeared: a `vec![...]`, `Seq(...)`, `List.of(...)` or Python list whose entries name components (`...Filter`, `...Source`, `...Hydrator`, `...Scorer`, `...SideEffect`, `...Rule`, ...) or that is bound to a name like `filters`, `sources`, `side_effects`, `rules` | that a registered component is active for any request |
 | `cosmetic` | the comment- and whitespace-insensitive tokens of both sides are equal (string literals kept whole; indentation kept for Python and YAML), or a file moved with identical content | semantic equivalence where parser coverage is incomplete |
 | `scoring-logic` | other changed code whose path, or else enclosing symbol, names scoring, weights or ranking (`scor`, `weight`, `rank`, `boost`, `penalt`, `decay`, `diversit`, `blend`, ...) | that the change alters any ranking outcome |
-| `model-config` | other changed code or configuration under a model, feature, config, schema, proto, thrift, inference or training location | that a model artifact was deployed |
-| `unknown` | everything else | anything: it needs review |
+| `model-config` | other changed code or configuration under a model, feature, config, schema, proto, thrift, inference, `train` or training location | that a model artifact was deployed |
+| `unknown` | everything else; each item says why (`detail.unknown_reason`): `no-rule` (a parsed language, and no rule matched), `not-parsed` (a language without symbol extraction, such as C, C++, CUDA or shell: only path and token rules could apply), `not-text`, `mode-only` | anything: it needs review |
+
+Every `scoring-logic` and `model-config` item records the rule that decided it in
+`detail.matched_by` (`path` or `symbol`, and the matched name). New rules are kept only after
+a seeded hand check of the items they move out of `unknown` (on `77d431a..78460ca`, seeds
+20261007 and 20261008, 42 items, each hunk read at both commits): the build-file rule 1/1,
+the import rule 22/22, the `train` location 18/18 and the test helper names 1/1 were
+correct. A filtering/visibility name
+rule (`filter`, `visib`, `safety` in a path or symbol, after every other rule) was tried and
+**rejected**: of 37 distinct sampled items it would have moved, 10 were rule or policy logic,
+8 hydration inputs to rules and 19 caches, telemetry, server wiring or staging tools, so the name says
+where code lives, not what it does. Those changes stay `unknown`; the digest counts unknown
+items by area, so a filtering subsystem still shows as such.
 
 Values are compared as their source text with comments removed and whitespace collapsed.
 A constant computed by code (for example `Duration::from_secs(compute())`) is logic, not a
@@ -87,7 +102,31 @@ default. Adjacent hunks of the same class inside the same symbol form one item.
 ## The digest
 
 `txray digest old new` (or `timelinexray.digest.DigestBuilder(store).build(old, new)`)
-builds one JSON document (`timelinexray/digest/v1`) and renders it as Markdown:
+builds one JSON document (`timelinexray/digest/v1`) and renders it as two Markdown files:
+
+- **`digest-<old>-<new>.md`, the main digest**, summary first and bounded in size: *At a
+  glance* (range, files and lines, the parameter, registration, `scoring-logic`,
+  and `unknown` counts with how they were decided, events, affected findings,
+  and what this file does not list), *What to check next* (the exact commands), then the
+  sections below. Parameter defaults, registrations, affected findings and the
+  `scoring-logic` items are listed with both citations; every other class
+  (model-config, test-only, build-dependency, cosmetic, docs, license, generated, unknown) is
+  counted by area (the first two directories of a path). Each section has a row budget
+  (`timelinexray.digest.render`: 60 parameter rows, 30 timelines, 30 registration rows, 40
+  finding rows, 120 logic items per class, else a by-file table of 40 rows); whatever does not
+  fit is named with its count at the top and in its section, and is in the appendix.
+- **`digest-<old>-<new>-appendix.md`**: every item the main file only counts, grouped by
+  class, area and file, each with its summary, its unknown reason or the name rule that
+  decided it, and both citations; plus the table rows the main file cut. Nothing is dropped:
+  main file + appendix list every item, and the JSON document holds all of them.
+- `--format md` (default) prints the main digest, `--format appendix` the appendix,
+  `--format json` the document; with `--out DIR`, `md` writes the main file and its
+  appendix. `txray update` writes all three.
+- The JSON document is complete (every item, file, hunk and citation) and gains, additively,
+  `overview.classes` (per class: items, files, lines, areas, `listed_in`, `decided_by` for the
+  name-rule classes, `reasons` for `unknown`) and `classes[].must_not_be_read_as`.
+
+Sections, in order (the summary-first block above them):
 
 - **Statements**: generated mechanically from diffs; commit messages never read; every
   value is a *public default* at the cited commit, not a production value; nothing has been
@@ -97,7 +136,9 @@ builds one JSON document (`timelinexray/digest/v1`) and renders it as Markdown:
   (`ancestor`, `same`, `reversed`, `diverged`, `unrelated-mirrors`); the first-parent
   chain; commits reached only through merges (their changes appear in the merge step).
 - **Exceptional events** (see below), or an explicit "none detected".
-- **Summary by class**: net items (old -> new) and items across all first-parent steps.
+- **Summary by class**: net items (old -> new), files, items across all first-parent steps,
+  where the class is listed (this file or the appendix), what the rule saw and what the class
+  must not be read as.
 - **Parameter default changes**: name, path, declaration, change, public default
   old -> new, and both citations. With more than one step, **values at intermediate
   commits** (a timeline per parameter that changed inside the range) and **intermediate
@@ -114,9 +155,12 @@ builds one JSON document (`timelinexray/digest/v1`) and renders it as Markdown:
   re-anchored on it: `txray update` prints `txray findings reanchor --latest` after a new
   pin, or does it in the same run with `--reanchor` (below; see also
   [findings-memory.md](findings-memory.md), "Current").
-- **Other classified changes**, then **unresolved and unknown changes** (listed, never
-  interpreted), **intermediate history** (per step: files, lines, items by class) and
-  **health** (history completeness, rename detection, symbol extraction coverage).
+- **Scoring-logic** items, grouped by file, each with both citations and
+  the name rule (path or enclosing symbol) that decided it; **other classes, counted by
+  area**; **unresolved and unknown changes** (counted by reason and area here, listed in the
+  appendix, never interpreted); **intermediate history** (per step: files, lines, items by
+  class) and **health** (history completeness, rename detection, symbol extraction
+  coverage).
 
 The document holds no timestamps other than committer times from git objects and no local
 locations (a `file://` upstream is reported as "a local file:// mirror"), and it records
@@ -196,9 +240,11 @@ want no ledger (the `DigestBuilder` default).
 5. the head is pinned (no second fetch) and compared with the previous pin: `--since`, else
    the accepted commit from `<store>/updates/state.json`, else the newest existing pin other than the head (a pin of the head
    is what an interrupted earlier run left, not a reported comparison);
-6. a digest `previous..head` (Markdown and JSON) is written into `DIR`, and
-   `DIR/update-status.json` records the outcome, events, head, previous and accepted
-   commits and the observation time (the status file, not the digest, carries timestamps).
+6. a digest `previous..head` (the main Markdown digest, its appendix and the JSON document)
+   is written into `DIR`, and `DIR/update-status.json` records the outcome, events, head,
+   previous and accepted commits, the observation time (the status file, not the digest,
+   carries timestamps) and `digest_summary` (items by class, parameter and registration
+   changes, unknown reasons, affected findings); the command prints the same counts.
 
 | Event (P7 section 4.4) | Detection | Response |
 | --- | --- | --- |
@@ -236,11 +282,18 @@ maintainer would otherwise do by hand after every new pin
 5. the review queue is compared before and after the re-anchoring. `update-status.json`
    records `ledger_refresh` (target, selection, findings re-anchored, freshness counts,
    `review_queue.before`/`after`/`added`/`removed` with finding id, trigger, priority and
-   scope, the ledger head and event count) and `export` (counts only); the command prints
-   `reanchor`, `queue` and `export` lines; and the exit code is 1 when new review items
-   appeared (a changed span, a negative search with hits, a dependency that went stale),
-   even when the observation itself was fine. Nothing is reviewed: freshness changes,
-   statuses never do.
+   scope, the ledger head and event count), `stale_review` (the stale-review summary at the
+   head: counts by freshness, area and outcome, the batch steps for unpinned cited commits
+   and unchecked findings, the first ten worklist entries and the next command; see
+   [findings-memory.md](findings-memory.md), "Stale review") and `export` (counts only);
+   the command prints `reanchor`, `queue` (the first ten new items in the worklist order,
+   parameter findings first, then `... and N more`), `review` (with the exact `txray
+   findings stale` command), `unpinned` (with `txray findings verify --pin-cited`, when
+   citations name unpinned commits) and `export` lines; and the exit code is 1 when new
+   review items appeared (a changed span, a negative search with hits, a dependency that
+   went stale), even when the observation itself was fine. Nothing is reviewed: freshness
+   changes, statuses never do. (On the 275 research findings and `77d431a..78460ca`: 86
+   new items, printed as ten lines plus one, where 0.10.0 printed 86.)
 
 The ledger must exist and verify (`--ledger DIR`, else `$TXRAY_FINDINGS`, else
 `<store>/findings` outside any git working tree); a missing or damaged ledger, or a refused
@@ -272,6 +325,8 @@ reported, not promised.
 
 | Range | Result |
 | --- | --- |
+| `77d431a..78460ca` (5 commits, 291 files), classifier v2 | 1,227 net items: parameter-default 25, registration 7, scoring-logic 65, model-config 162, docs-only 1, test-only 248, build-dependency 125, cosmetic 124, generated-vendored 1, unknown 469 (no-rule 459, not-parsed 10; classifier v1: 610 of 1,216). Main digest 39,991 bytes (classifier v1 and the one-file layout: 461,450), appendix 422,982, JSON 2,293,334; `PostUnexploredWeight` public default 0.02 -> 0.015 and `RetrievalCandidatesKafkaMaxCandidates` 200 -> 100000 in `home-mixer/params/param.rs` |
+| `aaa167b..77d431a`, classifier v2 | 2,689 net items, unknown 1,381 (v1: 1,522 of 2,684); main digest 68,360 bytes with every row budget reached and the cut rows named, appendix 1,145,053 |
 | `4c5cfe8..a707cc2` (1 step, 89 files) | 381 items: parameter-default 8, registration 1, scoring-logic 16, model-config 43, docs-only 1, test-only 121, cosmetic 1, unknown 190. `ClickWeight` public default 0.4 -> 0.3 in `home-mixer/params/param.rs` (L322 -> L329) and `vm-ranker/params.rs` (L18 -> L18), with `ContClickDwellTimeWeight` 0.0 -> 0.4 and `NotInterestedWeight` -43.2 -> -47.52 in both files; about 2 s |
 | `aaa167b..77d431a` (39 commits, 37 first-parent steps, one merge) | 2,164 files (2,090 added), 2,684 net items: parameter-default 210, registration 54, scoring-logic 243, model-config 466, license 4, docs-only 9, test-only 78, cosmetic 92, generated-vendored 6, unknown 1,522; timelines reproduce, for example, `ClickWeight` 0.4 at 47c1bcd -> 0.3 at a707cc2 and the reversion of `EnableAdsBrandSafetyVerdictV2` (false -> true -> false); about 30 s without an index; byte-identical across runs |
 | `4c5cfe8..a707cc2` with a ledger of 478 active findings (588 cited or dependency spans, no index) | affected findings: 48 findings (83 rows); 286 spans skipped (path untouched at both commits), 268 placed, 34 not placeable; about 1.9 s against 1.7 s without a ledger (7.7 s before the spans were indexed by path, the proposals skipped and the blobs read in one git process per commit); the affected rows are byte-identical to the unfiltered run |

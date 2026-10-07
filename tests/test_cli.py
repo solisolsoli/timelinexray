@@ -367,7 +367,8 @@ class HelpCompletenessTest(unittest.TestCase):
     def test_findings_subcommands_are_documented(self) -> None:
         top = self._subparsers(build_parser())
         findings = self._subparsers(top["findings"])
-        self.assertEqual(len(findings), 12)
+        self.assertEqual(len(findings), 13)
+        self.assertIn("stale", findings)
         missing = []
         for name, sub in findings.items():
             if not sub.description:

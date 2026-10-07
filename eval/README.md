@@ -34,6 +34,35 @@ measured numbers are in [docs/release-checklist.md](../docs/release-checklist.md
   being evaluated never edits it. Any change made after seeing live results must be
   recorded in the release checklist with its reason.
 
+## Set revisions
+
+A revision is a new file; an older revision is never edited, so a live result stays tied to
+the exact set it was scored with (the live report records the file, the revision and the
+file's SHA-256).
+
+| Revision | File | Status | Live runs |
+| --- | --- | --- | --- |
+| 1 | `questions.json` | root-reviewed 2026-10-01 | 2026-10-01 and 2026-10-02 (`live-run-2026-10-0*.txt`), both below the precision threshold |
+| 2 | `questions-v2.json` | root-reviewed 2026-10-07 | 2026-10-07 (`live-run-2026-10-07.txt`): precision 0.969 passes, abstention 7/9 fails |
+
+A revision file carries a top-level `revision` record: its number, date, the base revision
+(file, number, SHA-256, status), the thresholds (unchanged) and one change per item with the
+fields it changed (`question`, `expected.answer_regexes`, `expected.citations`, ...), the
+basis (a live-run analysis or a reading of the item) and the reason, plus the values before
+and after. `tests/test_eval_gate.py` pins the SHA-256 of revision 1, fails when revision 2
+differs from it anywhere except in the listed fields, keeps every existing expected citation,
+and checks each changed pattern against synthetic replies: correct replies that revision 1
+rejected are accepted, wrong replies are still rejected, and replies revision 1 accepted are
+still accepted.
+
+Revision 2 changes 16 answer items and no question text, abstain item, probe or threshold:
+Q22 gains the second occurrence of `initialTweetId.getOrElse` (line 227) as an expected
+citation and asks only for the initial post id, and Q05 accepts the prose forms of its
+conditions (both from the root analysis of the second live run); by reading, Q02 and Q04 no
+longer require an order their questions do not ask for, identifier patterns (Q01, Q03, Q20,
+Q21) accept a space or hyphen, Q25, Q27 and Q29 accept a thousands separator, and the negative
+weights (Q15-Q19) accept an en dash or "negative". The reasons are in the file.
+
 ## Deterministic harness (part of `make ci`)
 
 ```sh
@@ -42,7 +71,8 @@ txray pin 4c5cfe8f07f1c76d4f04277e803f20e6039f5191 --upstream file:///path/to/x-
 txray pin a707cc27ba36d3fa79450c9cffcc48a82d080b02 --upstream ... --store "$STORE"
 txray pin 77d431aabf409ca1c1eed9bec7e2183f7c914e23 --upstream ... --store "$STORE"
 txray index 77d431aabf409ca1c1eed9bec7e2183f7c914e23 --store "$STORE"
-python eval/run_gate.py --store "$STORE" [--json report.json]
+python eval/run_gate.py --store "$STORE" [--json report.json]                     # revision 2 (default)
+python eval/run_gate.py --store "$STORE" --questions eval/questions.json        # revision 1
 ```
 
 For every expected citation: `read_span` at the pinned commit must return `OK`, the span
@@ -58,8 +88,11 @@ temporary store built from the local upstream clone, so `make ci` (with
 ## Live harness (run by hand before a release)
 
 ```sh
-python eval/live_gate.py --store "$STORE" --out "$OUT" --model haiku --budget-usd 3.00
+python eval/live_gate.py --store "$STORE" --out "$OUT" --questions eval/questions-v2.json \
+    --model haiku --budget-usd 3.00
 ```
+
+Pass `--questions` explicitly so the report names the revision that was run.
 
 Each item becomes one `claude -p` call: `--strict-mcp-config` with a generated
 configuration for `txray mcp serve` on the store, `--tools ""` (no built-in tools),

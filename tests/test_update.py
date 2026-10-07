@@ -85,13 +85,19 @@ class UpdateFlowTest(unittest.TestCase):
         self.assertEqual((result.outcome, result.exit_code, result.previous, result.head),
                          ("updated", 0, self.c1, c2))
         name = f"digest-{self.c1[:12]}-{c2[:12]}"
-        self.assertEqual(result.written, [name + ".md", name + ".json"])
+        self.assertEqual(result.written, [name + ".md", name + "-appendix.md", name + ".json"])
+        self.assertTrue((self.up.out / (name + "-appendix.md")).read_text("utf-8").startswith(
+            "# Change digest appendix"))
         md = (self.up.out / (name + ".md")).read_text("utf-8")
         self.assertIn("public default `0.4` → `0.3`", md)
         self.assertEqual(load_state(self.up.store)["accepted"], c2)
         status = self.up.status()
         self.assertEqual((status["observed_at"], status["observation_succeeded"]), (CLOCK, True))
         self.assertEqual(status["digests"], result.written)
+        summary = status["digest_summary"]
+        self.assertEqual((summary["old"], summary["new"], summary["parameter_changes"]),
+                         (self.c1, c2, 1))
+        self.assertEqual(summary["items_by_class"]["parameter-default"], 1)
         self.assertNotIn(str(self.up.root), json.dumps(status))
 
         result = self.up.update()
@@ -416,12 +422,22 @@ class LedgerRefreshTest(unittest.TestCase):
         self.assertIn(b"queue      2 -> 3 open item(s); 1 new, 0 closed", out)
         self.assertIn(b"P1 changed_span", out)
         self.assertIn(b"export     1 finding(s) exported (1 current, 0 not current)", out)
-        self.assertIn(b"next       txray findings queue", out)
+        self.assertIn(b"next       txray findings stale", out)
+        self.assertIn(b"txray findings queue lists the items by trigger", out)
+        # the stale-review summary names the exact command with this run's locations
+        self.assertIn(b"review     1 finding(s) not current at the head (other 1): txray findings "
+                      b"stale --target " + self.c2[:12].encode() + b" --store "
+                      + str(self.up.store.root).encode() + b" --ledger "
+                      + str(self.ledger).encode(), out)
         self.assertNotIn(b"reanchor --latest", out)
         code, out, _ = run_cli([*args, "--json"], env)
         doc = json.loads(out)
         self.assertEqual((code, doc["outcome"], doc["data"]["outcome"]), (0, "ok", "no-change"))
         self.assertEqual(doc["data"]["ledger_refresh"]["findings"], 0)
+        stale = doc["data"]["ledger_refresh"]["stale_review"]
+        self.assertEqual((stale["counts"]["not_current"], stale["counts"]["freshness"]),
+                         (1, {"CURRENT": 1, "STALE": 1}))
+        self.assertEqual(stale["next"], f"txray findings stale --target {self.c2[:12]}")
         self.assertEqual(doc["data"]["export"]["files"]["written"], 0)
         self.assertEqual(doc["warnings"], [])
         code, out, _ = run_cli(args[:-3], env)  # neither flag: nothing is re-anchored

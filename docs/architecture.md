@@ -73,6 +73,13 @@ command. The semantic release gate lives outside the package, in `eval/` (a revi
 question set, a model-free check in `make ci` and a live harness run by hand; see
 [release-checklist.md](release-checklist.md)).
 
+**Stale review (unreleased).** `findings/stale.py` turns the recorded re-anchoring checks
+into a prioritised re-review list (`txray findings stale`, the `reanchor` summary and the
+`update --reanchor` report): the old span, the span located or aligned at the target, the
+exact commands and optional successor drafts. It only reads the ledger and the pins; review,
+supersession and retraction stay with the findings service and a named actor. The set
+revisions of the gate are separate files in `eval/` (`questions.json` is revision 1).
+
 **Setup command.** `txray setup` (`setup_cli.py`) composes existing guarded operations and
 adds no network code: `SnapshotStore.pin` (fetches through `netguard.fetch` only when the
 commit is not in the mirror; default commit `77d431aabf409ca1c1eed9bec7e2183f7c914e23`, the

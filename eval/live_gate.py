@@ -16,7 +16,7 @@ rate and citation integrity, each with its denominator, plus the total cost in U
 model and the client version. A hard total budget stops the run before it is exceeded and
 the items not run are listed as such. Partial results are written as they arrive.
 
-    python eval/live_gate.py --store DIR --out DIR [--questions eval/questions.json]
+    python eval/live_gate.py --store DIR --out DIR [--questions eval/questions-v2.json]
         [--model haiku] [--budget-usd 3.00] [--per-question-usd 0.20] [--ids Q01,A03]
 
 Developer tool, outside the ``timelinexray`` package; it needs the ``claude`` command and
@@ -313,7 +313,8 @@ def summarize(data: dict[str, Any], rows: list[dict[str, Any]],
         "schema": "timelinexray/eval-live-report/v1",
         "questions": {"total": len(data["items"]), "answer": total_answer, "abstain": total_abstain,
                       "run": len(run_rows), "not_run": len(rows) - len(run_rows),
-                      "errors": errors, "status": data.get("status")},
+                      "errors": errors, "status": data.get("status"),
+                      "revision": run_gate.revision_number(data)},
         "categories": dict(sorted(categories.items())),
         "metrics": metrics,
         "cost_usd": round(cost, 6),
@@ -357,7 +358,8 @@ def format_report(report: dict[str, Any], rows: list[dict[str, Any]]) -> str:
     lines = [
         f"live semantic gate: {questions['run']} / {questions['total']} items run "
         f"({questions['answer']} answer, {questions['abstain']} abstain in the set; "
-        f"{questions['not_run']} not run, {questions['errors']} errors); status: {questions['status']}",
+        f"{questions['not_run']} not run, {questions['errors']} errors); "
+        f"revision {questions.get('revision', 1)}; status: {questions['status']}",
         f"models: {', '.join(report['models']) or 'none'}; cost USD {report['cost_usd']:.4f}; "
         f"turns {report['turns']}; tokens {report['tokens']}",
     ]
@@ -415,7 +417,9 @@ def main(argv: list[str] | None = None) -> int:
     started = dt.datetime.now(dt.timezone.utc)
     version = claude_version(args.claude)
     digest = hashlib.sha256(Path(args.questions).read_bytes()).hexdigest()
-    print(f"live gate: {len(items)} items, model {args.model}, budget USD {args.budget_usd:.2f} "
+    print(f"live gate: {Path(args.questions).name} (revision {run_gate.revision_number(data)}, "
+          f"status {data.get('status')}), {len(items)} items, model {args.model}, "
+          f"budget USD {args.budget_usd:.2f} "
           f"(USD {args.per_question_usd:.2f} per item), client {version}", flush=True)
 
     rows: list[dict[str, Any]] = []
@@ -461,6 +465,8 @@ def main(argv: list[str] | None = None) -> int:
         "started_utc": started.isoformat(timespec="seconds"),
         "finished_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "model_requested": args.model, "client_version": version,
+        "questions_file": Path(args.questions).name,
+        "questions_revision": run_gate.revision_number(data),
         "questions_sha256": digest, "budget_usd": args.budget_usd,
         "per_question_usd": args.per_question_usd, "max_turns": args.max_turns,
     }

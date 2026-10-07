@@ -351,6 +351,44 @@ class BlobAnalysis:
             any(start <= line <= end for start, end in self.test_ranges) for line in lines
         )
 
+    # -- import and module declarations --------------------------------------------------
+
+    @cached_property
+    def declaration_lines(self) -> frozenset[int]:
+        """Lines inside an ``import`` symbol (Rust ``use`` / ``extern crate``, Java, Scala and
+        Python imports) or a bodyless ``module`` symbol (Rust ``mod name;``, a Java or Scala
+        ``package`` clause). Empty for files whose language is not parsed."""
+        if self.masked is None:
+            return frozenset()
+        code = self.masked.code
+        lines: set[int] = set()
+        for symbol in self.symbols.symbols:
+            if symbol.kind == "module":
+                a, b = self.char_range(symbol.start_line, min(symbol.end_line, self.line_count))
+                if "{" in code[a:b]:
+                    continue  # a module with a body holds code
+            elif symbol.kind != "import":
+                continue
+            lines.update(range(symbol.start_line, min(symbol.end_line, self.line_count) + 1))
+        return frozenset(lines)
+
+    def code_free(self, line: int) -> bool:
+        """The line holds no code: blank, or only a comment (native languages only)."""
+        if self.masked is None:
+            return not self.lines[line - 1].strip()
+        a, b = self.char_range(line, line)
+        return not self.masked.nocomment[a:b].strip()
+
+    def only_declarations(self, lines: list[int]) -> bool | None:
+        """Whether every code line of ``lines`` is an import or bodyless module declaration.
+
+        ``None`` when there is no code line at all (nothing to decide on this side)."""
+        declared = self.declaration_lines
+        code_lines = [line for line in lines if not self.code_free(line)]
+        if not code_lines:
+            return None
+        return all(line in declared for line in code_lines)
+
     # -- declarations with values --------------------------------------------------------
 
     @cached_property

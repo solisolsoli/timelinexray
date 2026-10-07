@@ -80,8 +80,11 @@ class RepoHygieneTest(unittest.TestCase):
         self.assertEqual(project["dependencies"], [])
         self.assertEqual(project["scripts"]["txray"], "timelinexray.cli:main")
         changelog = (REPO_ROOT / "CHANGELOG.md").read_text("utf-8")
-        first = re.search(r"^## \[([^\]]+)\]", changelog, re.MULTILINE)
-        self.assertEqual(first.group(1), __version__)
+        headings = re.findall(r"^## \[([^\]]+)\]", changelog, re.MULTILINE)
+        # an "Unreleased" section may sit on top; the first released section is the version
+        released = headings[1:] if headings and headings[0] == "Unreleased" else headings
+        self.assertNotIn("Unreleased", released)
+        self.assertEqual(released[0], __version__)
 
     def test_no_personal_absolute_paths(self) -> None:
         patterns = [re.compile(p.encode()) for p in ("/" + "Users/[A-Za-z]", "/" + "home/[a-z]")]

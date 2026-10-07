@@ -204,6 +204,58 @@ run's result): add the line-227 span as a second expected citation of Q22; eithe
 for the identifiers by name or accept the prose forms. Re-scoring this run with corrected
 items is not done: a pass requires a new run.
 
+### Set revision 2 (prepared and root-reviewed 2026-10-07)
+
+`eval/questions-v2.json` is a new revision of the set; `eval/questions.json` (revision 1),
+the two live-run reports and every number above stay exactly as recorded (a test pins the
+SHA-256 of revision 1). Thresholds unchanged. Nothing was re-scored and no live run was made
+with revision 2: a pass needs a new run. Each change is recorded in the file's `revision`
+member with its fields, basis and reason; in short:
+
+| Item | Change | Basis |
+| --- | --- | --- |
+| Q22 | second expected citation `UthDailyPostsJob.scala:227` (the second `initialTweetId.getOrElse`, span hash by plain `git show`); one pattern for the initial post id, because the question asks only about edited posts | second live run, root analysis above |
+| Q05 | the conditions may be written in prose (`in-network-only`, `cached posts`) as well as with the identifiers | second live run, root analysis above |
+| Q02, Q04 | one pattern per filter: the questions do not ask for an order | reading |
+| Q01, Q03, Q20, Q21 | identifiers may be written with a space or hyphen (`Tweet Mixer`, `VM ranker`, `positive sum`, `null-cast`); Q01 and Q03 keep the order they ask for | reading |
+| Q25, Q27, Q29 | a thousands separator (`1,200`) states the same public default; longer numbers are still rejected | reading |
+| Q15-Q19 | a negative public default may be written with an en dash or the word "negative" | reading |
+
+The deterministic harness passes on both revisions (revision 2: 237 / 237 checks, 50
+expected citations). The live command for the next run is in `eval/README.md`.
+
+
+### Third live run (2026-10-07, set revision 2)
+
+Run with Claude Code 2.1.292, model `claude-haiku-4-5-20251001`, `--strict-mcp-config`, max 25
+turns and USD 0.20 per item, against a fresh store with `4c5cfe8`, `a707cc2` and `77d431a`
+pinned and indexed (deterministic harness first: PASS 237/237); one invocation, every item ran
+exactly once. Total cost USD 1.39 (budget USD 3.00); 316 turns. Full per-item report:
+[`eval/live-run-2026-10-07.txt`](../eval/live-run-2026-10-07.txt).
+
+| Metric | Measured | Threshold | Result |
+| --- | --- | --- | --- |
+| Semantic citation precision | 31 / 32 = 0.969 | >= 0.95 | pass |
+| Coverage (recall) | 31 / 31 = 1.000 | >= 0.80 | pass |
+| Abstention accuracy | 7 / 9 = 0.778 | 1.00 | **fail** |
+| False-abstention rate | 0 / 31 = 0.000 | <= 0.20 | pass |
+| Citation integrity of the agent's citations | 53 / 53 = 1.000 | 1.00 | pass |
+| Completeness | 40 / 40 run, 1 error | every item, no errors | **fail** |
+
+**The gate failed again; the numbers are reported as measured.** Every answer item was correct.
+The two misses are abstention items, both of which passed in the second run:
+
+- A02 (`unsupported_answer`): asked for the probability that a specific viewer likes a specific
+  post, the agent described how such a probability is predicted and combined (with citations to
+  the upstream README) instead of abstaining; the value itself is not in the public code.
+- A06 (`error`): the agent searched for a link-based demotion until the 25-turn limit and gave
+  no reply.
+
+Root reading: the items are sound (no set change is proposed); the misses are agent behaviour
+that varies between runs at the same settings. Nothing was re-scored. A pass needs a new run;
+whether to strengthen the agent contract's abstention rule before it is a design decision that
+would be evaluated on this same set, so it is recorded here rather than made now.
+
 ### Gate rule (root-reviewed 2026-10-01)
 
 The release gate fails when any of these does not hold; every number is reported with

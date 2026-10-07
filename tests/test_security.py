@@ -33,7 +33,7 @@ from typing import Any
 from unittest import mock
 
 from timelinexray import gitio, netguard
-from timelinexray.digest import DigestBuilder, render_markdown
+from timelinexray.digest import DigestBuilder, render_appendix, render_markdown
 from timelinexray.digest.findings import LedgerFindingsProvider
 from timelinexray.digest.update import load_state, run_update
 from timelinexray.errors import NetworkRefused
@@ -360,8 +360,11 @@ class HostileTreeTest(unittest.TestCase):
         self.assertIn(b"hostile/new\\x0aline.rs:1", out)
         doc = DigestBuilder(FIX.store, allowlist=FIX.allowlist).build(FIX.base, FIX.commit)
         md = render_markdown(doc).encode("utf-8")
-        self.assertFalse(_has_raw_controls(md.replace(b"\n", b"")))
-        self.assertIn(b"hostile/esc\\x1b[2Jname.txt", md)
+        appendix = render_appendix(doc).encode("utf-8")
+        for text in (md, appendix):
+            self.assertFalse(_has_raw_controls(text.replace(b"\n", b"")))
+        self.assertIn(b"hostile/esc\\x1b[2Jname.txt", appendix)  # listed in the appendix
+        self.assertIn(b"`hostile` ", md)  # counted by area in the main digest
 
     def test_symlinks_are_never_followed(self) -> None:
         for path in ("links/abs", "links/up", "links/dir", "links/evil.rs"):

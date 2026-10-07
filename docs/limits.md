@@ -77,9 +77,24 @@ scope, not a bug report; where a limit is enforced, the test that enforces it is
   write, a changed or removed event, or a truncated log needs a backup
   ([findings-memory.md](findings-memory.md), "Recovery").
 - Dependencies are declared by authors; nothing infers them.
+- **The stale-review order is a name heuristic.** `txray findings stale` puts parameter
+  findings first and then findings whose cited path or component matches the digest's
+  scoring-name rule; a scoring finding on a neutrally named path sorts with the rest. Every
+  not-current finding is listed either way. Its successor drafts copy the claim unchanged
+  (a changed parameter default makes the copied claim false): `supersede` refuses a draft
+  until an author removes its `remove_after_reading` member, and the successor is a draft
+  that a different reviewer must still review. No draft is offered when an anchor's own
+  text changed, for ambiguous, missing or unusable spans, span dependencies or negative
+  searches.
+- `txray findings verify --pin-cited` pins from the store's single upstream (or
+  `--upstream`); a store with pins of several upstreams needs `--upstream`, and a commit
+  the upstream no longer has cannot be pinned.
 - The reference sets are 35 citation goldens (8 with 14 history expectations) and the
   40-question semantic gate set in `eval/questions.json` (31 answer, 9 abstention items;
-  root-reviewed 2026-10-01; its first live run on 2026-10-01 did not pass). Its deterministic harness runs in `make ci`; its live
+  root-reviewed 2026-10-01; neither live run, 2026-10-01 and 2026-10-02, passed), with its
+  revision 2 `eval/questions-v2.json` (root-reviewed 2026-10-07: corrected answer patterns and
+  one added expected citation; live run 2026-10-07: precision 0.969, abstention 7/9, not passed). Its deterministic harness runs in `make ci`
+  on both revisions; its live
   harness runs one agent once per release by hand, so the semantic precision, coverage and
   abstention numbers hold for that date, model and client only, with the sample sizes
   given in [release-checklist.md](release-checklist.md). Answer correctness is scored by
@@ -91,6 +106,13 @@ scope, not a bug report; where a limit is enforced, the test that enforces it is
 - Classification is heuristic (names, paths, masked source, symbols); a value read from a
   configuration service at runtime is invisible; the `home-mixer` and `vm-ranker` copies of
   a weight are not asserted to correspond; registration detection sees list literals only.
+  Name and path classes (`scoring-logic`, `model-config`) say where code lives, not what it
+  does; no filtering/visibility class exists because a name rule for it was mostly wrong in a
+  hand check ([updates.md](updates.md)), so filtering code is `unknown` unless another rule
+  applies. About 38 % of the items of `77d431a..78460ca` stay `unknown` (classifier v2).
+- The main Markdown digest is bounded by row budgets; on a large range it names what it cut
+  and the appendix holds the rest. The appendix and the JSON document are not bounded
+  (the appendix of `aaa167b..77d431a` is about 1.1 MB).
 - Ancestry uses first parents; a commit reached only through a merge appears in the merge
   step.
 - The digest's affected-findings section lists findings whose *spans* touch a change; a

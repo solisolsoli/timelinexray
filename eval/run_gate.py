@@ -10,7 +10,11 @@ item it runs the item's probes through ``search_code`` and requires zero hits, s
 supporting span exists in the index. It exits 0 only when every check passes, and its
 report carries every denominator.
 
-    python eval/run_gate.py --store DIR [--questions eval/questions.json] [--json PATH]
+    python eval/run_gate.py --store DIR [--questions eval/questions-v2.json] [--json PATH]
+
+The default question file is the newest set revision (``questions-v2.json``, revision 2);
+revision 1 (``questions.json``) is kept unchanged with its live-run results and is checked
+with ``--questions eval/questions.json``.
 
 The store must hold the question set's pinned commits (``commits.pinned``) with the code
 index built for ``commits.indexed`` (``txray pin`` / ``txray index``). The harness is a
@@ -34,7 +38,9 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_QUESTIONS = REPO_ROOT / "eval" / "questions.json"
+QUESTIONS_V1 = REPO_ROOT / "eval" / "questions.json"
+#: The newest set revision; every older revision stays in the repository unchanged.
+DEFAULT_QUESTIONS = REPO_ROOT / "eval" / "questions-v2.json"
 SCHEMA = "timelinexray/eval-questions/v1"
 KINDS = ("answer", "abstain")
 EVIDENCE_CLASSES = ("CODE", "PARAM_DEFAULT", "REPO_DOC", "OFFICIAL", "THIRD_PARTY",
@@ -45,6 +51,11 @@ CITATION_KEYS = {"commit", "path", "start_line", "end_line", "anchor", "span_sha
 ANSWER_EXPECTED_KEYS = {"answer_regexes", "citations"}
 ABSTAIN_EXPECTED_KEYS = {"abstention_reason", "probes"}
 PROBE_KEYS = {"query", "literal"}
+REVISION_KEYS = {"number", "date", "base", "thresholds", "summary", "changes"}
+CHANGE_KEYS = {"id", "fields", "basis", "reason", "before", "after"}
+CHANGE_FIELDS = ("question", "expected.answer_regexes", "expected.citations",
+                 "expected.abstention_reason", "expected.probes")
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SOURCE_RE = re.compile(r"^P[0-9]b?-[0-9]{3}$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -187,6 +198,61 @@ def validate(data: Any) -> list[str]:
     seen: set[str] = set()
     for item in items:
         problems.extend(_validate_item(item, seen, pinned, indexed))
+    if "revision" in data:
+        problems.extend(_validate_revision(data["revision"], seen))
+    return problems
+
+
+def revision_number(data: Mapping[str, Any]) -> int:
+    """The set revision: ``revision.number``, or 1 for a set without a revision record."""
+    revision = data.get("revision")
+    return int(revision["number"]) if isinstance(revision, dict) else 1
+
+
+def _validate_revision(revision: Any, ids: set[str]) -> list[str]:
+    """A set revision names its base revision (file, number, SHA-256) and every changed
+    item with the fields it changed and the reason; nothing else may differ."""
+    if not isinstance(revision, dict):
+        return ["revision must be an object"]
+    problems: list[str] = []
+    if set(revision) != REVISION_KEYS:
+        problems.append(f"revision must have exactly {sorted(REVISION_KEYS)}")
+    number = revision.get("number")
+    if not isinstance(number, int) or isinstance(number, bool) or number < 2:
+        problems.append("revision.number must be an integer >= 2")
+    if not DATE_RE.match(str(revision.get("date", ""))):
+        problems.append("revision.date must be YYYY-MM-DD")
+    base = revision.get("base")
+    if not isinstance(base, dict) or not isinstance(base.get("file"), str) \
+            or not SHA256_RE.match(str(base.get("sha256", ""))) \
+            or not isinstance(base.get("number"), int) \
+            or (isinstance(number, int) and base.get("number") != number - 1):
+        problems.append("revision.base must name the previous revision: file, number, sha256")
+    for key in ("thresholds", "summary"):
+        if not isinstance(revision.get(key), str) or not revision.get(key, "").strip():
+            problems.append(f"revision.{key} must be a non-empty string")
+    changes = revision.get("changes")
+    if not isinstance(changes, list) or not changes:
+        return problems + ["revision.changes must be a non-empty list"]
+    changed: set[str] = set()
+    for change in changes:
+        if not isinstance(change, dict) or not {"id", "fields", "basis", "reason"} <= set(change) \
+                or set(change) - CHANGE_KEYS:
+            problems.append("each revision change needs id, fields, basis and reason")
+            continue
+        label = str(change["id"])
+        if label not in ids:
+            problems.append(f"revision change {label}: no such item")
+        if label in changed:
+            problems.append(f"revision change {label}: listed twice")
+        changed.add(label)
+        fields = change["fields"]
+        if not isinstance(fields, list) or not fields or any(f not in CHANGE_FIELDS for f in fields):
+            problems.append(f"revision change {label}: fields must be a non-empty list of "
+                            f"{CHANGE_FIELDS}")
+        for key in ("basis", "reason"):
+            if not isinstance(change[key], str) or not change[key].strip():
+                problems.append(f"revision change {label}: {key} must be a non-empty string")
     return problems
 
 
@@ -447,6 +513,7 @@ def summarize(data: dict[str, Any], checks: list[Check]) -> dict[str, Any]:
             "citations": sum(len(item["expected"].get("citations", [])) for item in items),
             "probes": sum(len(item["expected"].get("probes", [])) for item in items),
             "status": data.get("status"),
+            "revision": revision_number(data),
         },
         "checks": {kind: dict(row) for kind, row in sorted(by_kind.items())},
         "passed": sum(check.ok for check in checks),
@@ -461,7 +528,8 @@ def format_report(report: dict[str, Any]) -> str:
     lines = [
         f"question set: {questions['total']} items ({questions['answer']} answer, "
         f"{questions['abstain']} abstain), {questions['citations']} expected citations, "
-        f"{questions['probes']} abstention probes; status: {questions['status']}",
+        f"{questions['probes']} abstention probes; revision {questions.get('revision', 1)}; "
+        f"status: {questions['status']}",
     ]
     for kind, row in report["checks"].items():
         lines.append(f"  {kind:<13} {row['passed']} / {row['total']}")

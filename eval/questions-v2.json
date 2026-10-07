@@ -1,0 +1,1522 @@
+{
+  "schema": "timelinexray/eval-questions/v1",
+  "upstream": "https://github.com/xai-org/x-algorithm.git",
+  "status": "root-reviewed 2026-10-07",
+  "description": "Semantic release-gate question set. Answer items come only from research findings with a non-empty root check (their id is `source`); expected citations are commit-pinned spans with an oracle SHA-256 and an anchor, plus the tool lookup that must find them. Abstention items ask for facts that are not in the public code; their probes must return no hits. No claim text, no report prose.",
+  "commits": {
+    "indexed": [
+      "77d431aabf409ca1c1eed9bec7e2183f7c914e23"
+    ],
+    "pinned": [
+      "4c5cfe8f07f1c76d4f04277e803f20e6039f5191",
+      "a707cc27ba36d3fa79450c9cffcc48a82d080b02",
+      "77d431aabf409ca1c1eed9bec7e2183f7c914e23"
+    ]
+  },
+  "items": [
+    {
+      "id": "Q01",
+      "kind": "answer",
+      "source": "P1-013",
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "At the pinned commit, which candidate sources does `PhoenixCandidatePipeline` in home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs register in its `sources` vector, and in what order?",
+      "expected": {
+        "answer_regexes": [
+          "(?s)thunder.*tweet[ _-]?mixer.*sim[ _-]?clusters.*phoenix.*phoenix[ _-]?topics.*phoenix[ _-]?moe.*cached"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs",
+            "start_line": 322,
+            "end_line": 330,
+            "anchor": "let sources:",
+            "span_sha256": "3cf0a5c059666a047f55d0724fb0dd9ddd870a9f95b7e81aa5c7da3b127e8683"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q02",
+      "kind": "answer",
+      "source": "P1-015",
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "How many pre-scoring filters does `PhoenixCandidatePipeline` (home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs) register in its `filters` vector at the pinned commit, and which two filters come last?",
+      "expected": {
+        "answer_regexes": [
+          "\\b(19|nineteen)\\b",
+          "Inventory[ _-]?Holdout",
+          "Fav(?:orite)?[ _-]?Holdout"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs",
+            "start_line": 358,
+            "end_line": 387,
+            "anchor": "Box::new(FavHoldoutFilter)",
+            "span_sha256": "252c1d8a5b2453b5562d4dae76b16fbacfbd0a041286180dfe7870663bafbde9"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q03",
+      "kind": "answer",
+      "source": "P1-016",
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Which scorer objects does the `scorers` vector of `PhoenixCandidatePipeline` (home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs) contain at the pinned commit, in order?",
+      "expected": {
+        "answer_regexes": [
+          "(?s)phoenix[ _-]?scorer.*vm[ _-]?ranker"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs",
+            "start_line": 418,
+            "end_line": 419,
+            "anchor": "vec![phoenix_scorer, vm_ranker]",
+            "span_sha256": "d4978a61db6309208857ef8ce327bb444d52e4bd2afef042423802243b04f372"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q04",
+      "kind": "answer",
+      "source": "P1-018",
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Which filters does `PhoenixCandidatePipeline` (home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs) register as post-selection filters at the pinned commit?",
+      "expected": {
+        "answer_regexes": [
+          "\\bVF[ _-]?Filter",
+          "Ancillary[ _-]?VF(?:[ _-]?Filter)?",
+          "Dedup\\w*[ _-]?Conversation"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs",
+            "start_line": 443,
+            "end_line": 447,
+            "anchor": "DedupConversationFilter",
+            "span_sha256": "897e03c4b355f4205c721881202d685aff56406410f6721f2cb6c6d81f0a1a43"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q05",
+      "kind": "answer",
+      "source": "P1-028",
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Under which conditions does PhoenixSource's `enable` method return true for a query at the pinned commit (home-mixer/sources/phoenix_source.rs)?",
+      "expected": {
+        "answer_regexes": [
+          "Enable[ _-]?Phoenix[ _-]?Source",
+          "topic",
+          "in[ _-]?network[ _-]?only",
+          "cached[ _-]?posts"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/sources/phoenix_source.rs",
+            "start_line": 98,
+            "end_line": 102,
+            "anchor": "has_cached_posts",
+            "span_sha256": "1ac90b70c67abe24d3040ed41a3149a0248071ae162f70ae27acaff0de45bcdd",
+            "lookup": {
+              "tool": "find_symbols",
+              "name": "enable",
+              "kind": "method",
+              "path_prefix": "home-mixer/sources/phoenix_source.rs"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q06",
+      "kind": "answer",
+      "source": "P2-011",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the value-model weight `FavoriteWeight` (the weight of a like (favorite)) at the pinned commit, and in which files is it declared?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])0\\.50*(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 302,
+            "end_line": 302,
+            "anchor": "FavoriteWeight",
+            "span_sha256": "99d404d4f6dc51a86573d9802952c43c8f8c0af84bb598c726d9beac02018207",
+            "lookup": {
+              "tool": "get_param",
+              "name": "FavoriteWeight",
+              "value": "0.5"
+            }
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "vm-ranker/params.rs",
+            "start_line": 3,
+            "end_line": 3,
+            "anchor": "FavoriteWeight",
+            "span_sha256": "99d404d4f6dc51a86573d9802952c43c8f8c0af84bb598c726d9beac02018207",
+            "lookup": {
+              "tool": "get_param",
+              "name": "FavoriteWeight",
+              "value": "0.5"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q07",
+      "kind": "answer",
+      "source": "P2-012",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the value-model weight `ReplyWeight` (the weight of a reply) at the pinned commit, and in which files is it declared?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])5(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 303,
+            "end_line": 303,
+            "anchor": "ReplyWeight",
+            "span_sha256": "49b02ed52c89f9e16329ceb6ce5cd0859e58b578617f47a04d56ceafd2529844",
+            "lookup": {
+              "tool": "get_param",
+              "name": "ReplyWeight",
+              "value": "5.0"
+            }
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "vm-ranker/params.rs",
+            "start_line": 4,
+            "end_line": 4,
+            "anchor": "ReplyWeight",
+            "span_sha256": "49b02ed52c89f9e16329ceb6ce5cd0859e58b578617f47a04d56ceafd2529844",
+            "lookup": {
+              "tool": "get_param",
+              "name": "ReplyWeight",
+              "value": "5.0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q08",
+      "kind": "answer",
+      "source": "P2-013",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the value-model weight `RetweetWeight` (the weight of a repost (retweet)) at the pinned commit, and in which files is it declared?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])1(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 316,
+            "end_line": 316,
+            "anchor": "RetweetWeight",
+            "span_sha256": "27252f3cec46e998e8c2045ebf8c03d8617d33b6eb8ce66a289bef81c87af863",
+            "lookup": {
+              "tool": "get_param",
+              "name": "RetweetWeight",
+              "value": "1.0"
+            }
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "vm-ranker/params.rs",
+            "start_line": 5,
+            "end_line": 5,
+            "anchor": "RetweetWeight",
+            "span_sha256": "27252f3cec46e998e8c2045ebf8c03d8617d33b6eb8ce66a289bef81c87af863",
+            "lookup": {
+              "tool": "get_param",
+              "name": "RetweetWeight",
+              "value": "1.0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q09",
+      "kind": "answer",
+      "source": "P2-016",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the value-model weight `ClickWeight` (the weight of a post click) at the pinned commit, and in which files is it declared?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])0\\.30*(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 329,
+            "end_line": 329,
+            "anchor": "ClickWeight",
+            "span_sha256": "4b5c535dbf7b2b6ac766b2405034e203e934bee70377b44d0899c8923b2fe28c",
+            "lookup": {
+              "tool": "get_param",
+              "name": "ClickWeight",
+              "value": "0.3"
+            }
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "vm-ranker/params.rs",
+            "start_line": 18,
+            "end_line": 18,
+            "anchor": "ClickWeight",
+            "span_sha256": "4b5c535dbf7b2b6ac766b2405034e203e934bee70377b44d0899c8923b2fe28c",
+            "lookup": {
+              "tool": "get_param",
+              "name": "ClickWeight",
+              "value": "0.3"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q10",
+      "kind": "answer",
+      "source": "P2-017",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the value-model weight `OpenLinkWeight` (the weight of opening an external link) at the pinned commit, and in which files is it declared?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])0\\.20*(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 330,
+            "end_line": 330,
+            "anchor": "OpenLinkWeight",
+            "span_sha256": "66d43c97cf496b6fedf9d44b4a513a8105cbe7f8eb34d1f93ec5f300dd93ce50",
+            "lookup": {
+              "tool": "get_param",
+              "name": "OpenLinkWeight",
+              "value": "0.2"
+            }
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "vm-ranker/params.rs",
+            "start_line": 19,
+            "end_line": 19,
+            "anchor": "OpenLinkWeight",
+            "span_sha256": "66d43c97cf496b6fedf9d44b4a513a8105cbe7f8eb34d1f93ec5f300dd93ce50",
+            "lookup": {
+              "tool": "get_param",
+              "name": "OpenLinkWeight",
+              "value": "0.2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q11",
+      "kind": "answer",
+      "source": "P2-019",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the value-model weight `VqvWeight` (the weight of a video quality view) at the pinned commit, and in which files is it declared?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])0(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 337,
+            "end_line": 337,
+            "anchor": "VqvWeight",
+            "span_sha256": "8101f586a019e73366006ec34060115be4928ec903324662ae6616d075b79ce5",
+            "lookup": {
+              "tool": "get_param",
+              "name": "VqvWeight",
+              "value": "0.0"
+            }
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "vm-ranker/params.rs",
+            "start_line": 26,
+            "end_line": 26,
+            "anchor": "VqvWeight",
+            "span_sha256": "8101f586a019e73366006ec34060115be4928ec903324662ae6616d075b79ce5",
+            "lookup": {
+              "tool": "get_param",
+              "name": "VqvWeight",
+              "value": "0.0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q12",
+      "kind": "answer",
+      "source": "P2-020",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the value-model weight `ShareWeight` (the weight of a share) at the pinned commit, and in which files is it declared?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])2(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 338,
+            "end_line": 338,
+            "anchor": "ShareWeight",
+            "span_sha256": "0ea5b3fa76f8deb33c7a0e0cb8ace41e0e54c2902dbc1435815735ee3910dde5",
+            "lookup": {
+              "tool": "get_param",
+              "name": "ShareWeight",
+              "value": "2.0"
+            }
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "vm-ranker/params.rs",
+            "start_line": 27,
+            "end_line": 27,
+            "anchor": "ShareWeight",
+            "span_sha256": "0ea5b3fa76f8deb33c7a0e0cb8ace41e0e54c2902dbc1435815735ee3910dde5",
+            "lookup": {
+              "tool": "get_param",
+              "name": "ShareWeight",
+              "value": "2.0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q13",
+      "kind": "answer",
+      "source": "P2-023",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the value-model weight `DwellWeight` (the weight of a discrete dwell) at the pinned commit, and in which files is it declared?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])0\\.050*(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 351,
+            "end_line": 351,
+            "anchor": "DwellWeight",
+            "span_sha256": "ee92def6f4e3a36ef6d4b0688767e89498fca6f191913d85ccdbbdd80a45258d",
+            "lookup": {
+              "tool": "get_param",
+              "name": "DwellWeight",
+              "value": "0.05"
+            }
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "vm-ranker/params.rs",
+            "start_line": 40,
+            "end_line": 40,
+            "anchor": "DwellWeight",
+            "span_sha256": "ee92def6f4e3a36ef6d4b0688767e89498fca6f191913d85ccdbbdd80a45258d",
+            "lookup": {
+              "tool": "get_param",
+              "name": "DwellWeight",
+              "value": "0.05"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q14",
+      "kind": "answer",
+      "source": "P2-029",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the value-model weight `FollowAuthorWeight` (the weight of following the author) at the pinned commit, and in which files is it declared?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])4(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 365,
+            "end_line": 370,
+            "anchor": "FollowAuthorWeight",
+            "span_sha256": "7ef4c67270544f4fe1ee14d0135ba60e94b0a51082382d8f1c16312f330b47e2",
+            "lookup": {
+              "tool": "get_param",
+              "name": "FollowAuthorWeight",
+              "value": "4.0"
+            }
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "vm-ranker/params.rs",
+            "start_line": 66,
+            "end_line": 71,
+            "anchor": "FollowAuthorWeight",
+            "span_sha256": "7ef4c67270544f4fe1ee14d0135ba60e94b0a51082382d8f1c16312f330b47e2",
+            "lookup": {
+              "tool": "get_param",
+              "name": "FollowAuthorWeight",
+              "value": "4.0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q15",
+      "kind": "answer",
+      "source": "P2-030",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the value-model weight `NotInterestedWeight` (the weight of a 'not interested' signal) at the pinned commit, and in which files is it declared?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])(-|−|–|minus\\s*|negative\\s+)47\\.520*(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 390,
+            "end_line": 395,
+            "anchor": "NotInterestedWeight",
+            "span_sha256": "8558ed06f3929f00c1198af085eaa4268227ec9a40dc2fcc0952cc617e984773",
+            "lookup": {
+              "tool": "get_param",
+              "name": "NotInterestedWeight",
+              "value": "-47.52"
+            }
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "vm-ranker/params.rs",
+            "start_line": 78,
+            "end_line": 83,
+            "anchor": "NotInterestedWeight",
+            "span_sha256": "8558ed06f3929f00c1198af085eaa4268227ec9a40dc2fcc0952cc617e984773",
+            "lookup": {
+              "tool": "get_param",
+              "name": "NotInterestedWeight",
+              "value": "-47.52"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q16",
+      "kind": "answer",
+      "source": "P2-031",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the value-model weight `BlockAuthorWeight` (the weight of blocking the author) at the pinned commit, and in which files is it declared?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])(-|−|–|minus\\s*|negative\\s+)31\\.20*(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 396,
+            "end_line": 401,
+            "anchor": "BlockAuthorWeight",
+            "span_sha256": "44828ee4d29d554949cd9389f90a84e6c235702608944e7f46933204cca962a7",
+            "lookup": {
+              "tool": "get_param",
+              "name": "BlockAuthorWeight",
+              "value": "-31.2"
+            }
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "vm-ranker/params.rs",
+            "start_line": 84,
+            "end_line": 89,
+            "anchor": "BlockAuthorWeight",
+            "span_sha256": "44828ee4d29d554949cd9389f90a84e6c235702608944e7f46933204cca962a7",
+            "lookup": {
+              "tool": "get_param",
+              "name": "BlockAuthorWeight",
+              "value": "-31.2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q17",
+      "kind": "answer",
+      "source": "P2-032",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the value-model weight `MuteAuthorWeight` (the weight of muting the author) at the pinned commit, and in which files is it declared?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])(-|−|–|minus\\s*|negative\\s+)58\\.80*(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 402,
+            "end_line": 407,
+            "anchor": "MuteAuthorWeight",
+            "span_sha256": "b70e28c14b8c5f408a27a444b721bcc86b2965e339d9addf8c61e3ac0d004cb5",
+            "lookup": {
+              "tool": "get_param",
+              "name": "MuteAuthorWeight",
+              "value": "-58.8"
+            }
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "vm-ranker/params.rs",
+            "start_line": 90,
+            "end_line": 95,
+            "anchor": "MuteAuthorWeight",
+            "span_sha256": "b70e28c14b8c5f408a27a444b721bcc86b2965e339d9addf8c61e3ac0d004cb5",
+            "lookup": {
+              "tool": "get_param",
+              "name": "MuteAuthorWeight",
+              "value": "-58.8"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q18",
+      "kind": "answer",
+      "source": "P2-033",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the value-model weight `ReportWeight` (the weight of a report) at the pinned commit, and in which files is it declared?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])(-|−|–|minus\\s*|negative\\s+)234(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 408,
+            "end_line": 408,
+            "anchor": "ReportWeight",
+            "span_sha256": "73b53423cd86f366f604328a7ca3e70d73ce26817b8e263f68f31534075410a3",
+            "lookup": {
+              "tool": "get_param",
+              "name": "ReportWeight",
+              "value": "-234.0"
+            }
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "vm-ranker/params.rs",
+            "start_line": 96,
+            "end_line": 96,
+            "anchor": "ReportWeight",
+            "span_sha256": "73b53423cd86f366f604328a7ca3e70d73ce26817b8e263f68f31534075410a3",
+            "lookup": {
+              "tool": "get_param",
+              "name": "ReportWeight",
+              "value": "-234.0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q19",
+      "kind": "answer",
+      "source": "P2-034",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the value-model weight `NotDwelledWeight` (the weight of a 'not dwelled' signal) at the pinned commit, and in which files is it declared?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])(-|−|–|minus\\s*|negative\\s+)0\\.020*(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 409,
+            "end_line": 414,
+            "anchor": "NotDwelledWeight",
+            "span_sha256": "2f7131eb495f21da5303df84acd2d23e11a3a0acba67c3038f4cb2d3cdbe2476",
+            "lookup": {
+              "tool": "get_param",
+              "name": "NotDwelledWeight",
+              "value": "-0.02"
+            }
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "vm-ranker/params.rs",
+            "start_line": 97,
+            "end_line": 102,
+            "anchor": "NotDwelledWeight",
+            "span_sha256": "2f7131eb495f21da5303df84acd2d23e11a3a0acba67c3038f4cb2d3cdbe2476",
+            "lookup": {
+              "tool": "get_param",
+              "name": "NotDwelledWeight",
+              "value": "-0.02"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q20",
+      "kind": "answer",
+      "source": "P2-095",
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "In xai-value-model/weights.rs at the pinned commit, how does `total_sum` combine the other sums of the weight set?",
+      "expected": {
+        "answer_regexes": [
+          "positive[ _-]?sum",
+          "negative[ _-]?sum"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "xai-value-model/weights.rs",
+            "start_line": 45,
+            "end_line": 76,
+            "anchor": "self.positive_sum() + self.negative_sum()",
+            "span_sha256": "6f0abe9a0f8856091d419256969621db0d5b7794dae4863cb17cb169e6460078",
+            "lookup": {
+              "tool": "find_symbols",
+              "name": "total_sum",
+              "kind": "method",
+              "path_prefix": "xai-value-model/weights.rs"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q21",
+      "kind": "answer",
+      "source": "P3-035",
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "In under-the-hood/scalding/UthDailyPostsJob.scala at the pinned commit, which two conditions on a post record (besides the user-scope check) must hold for it to enter the daily post cohort?",
+      "expected": {
+        "answer_regexes": [
+          "share[ _-]?source[ _-]?tweet[ _-]?id",
+          "null[ _-]?cast"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "under-the-hood/scalding/UthDailyPostsJob.scala",
+            "start_line": 199,
+            "end_line": 199,
+            "anchor": "t.shareSourceTweetId.isEmpty",
+            "span_sha256": "f262a9855bfe458441f54ffc8f7bd0aa2b985bd702fb5535c6491395e67b72b0"
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "under-the-hood/scalding/UthDailyPostsJob.scala",
+            "start_line": 226,
+            "end_line": 226,
+            "anchor": "!tweet.nullcast",
+            "span_sha256": "f3466d950e54b014eab6c7213c81f504ab904877069d1fd4f08bde1b911a5090"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q22",
+      "kind": "answer",
+      "source": "P3-037",
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "In UthDailyPostsJob.scala at the pinned commit, how is the logical post id derived for an edited post (a record with an initial post id)?",
+      "expected": {
+        "answer_regexes": [
+          "initial[ _-]?(?:tweet|post)[ _-]?id"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "under-the-hood/scalding/UthDailyPostsJob.scala",
+            "start_line": 200,
+            "end_line": 200,
+            "anchor": "initialTweetId.getOrElse",
+            "span_sha256": "768bd3808bacf4ab9e82b66424c79e60d67c6ffd7f2f40664fe30f89571a151e"
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "under-the-hood/scalding/UthDailyPostsJob.scala",
+            "start_line": 227,
+            "end_line": 227,
+            "anchor": "initialTweetId.getOrElse",
+            "span_sha256": "65ddcf7329bf9a44ae59a0887ed34c7b0555a5efbd1bed510659aa42fff3fd03"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q23",
+      "kind": "answer",
+      "source": "P3-038",
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "In under-the-hood/scalding/UthDailyAccountLabelsJob.scala at the pinned commit, at what time granularity does `targetDays` enumerate the window (what step does the range use)?",
+      "expected": {
+        "answer_regexes": [
+          "DayMs|\\bdays?\\b|daily"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "under-the-hood/scalding/UthDailyAccountLabelsJob.scala",
+            "start_line": 33,
+            "end_line": 52,
+            "anchor": "val targetDays",
+            "span_sha256": "44014036c89a8f541b36e4496644ca90fb813b67980e2e4464ec0ef646e86422"
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q24",
+      "kind": "answer",
+      "source": "P1b-006",
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of MIN_CACHED_POSTS_THRESHOLD in home-mixer/query_hydrators/cached_posts_query_hydrator.rs at the pinned commit?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])500(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/query_hydrators/cached_posts_query_hydrator.rs",
+            "start_line": 11,
+            "end_line": 11,
+            "anchor": "MIN_CACHED_POSTS_THRESHOLD",
+            "span_sha256": "65fe961e95f2bb95a686ebdb3947af97936ff6b6c4833f2cdea56027a0f03f34",
+            "lookup": {
+              "tool": "find_symbols",
+              "name": "MIN_CACHED_POSTS_THRESHOLD",
+              "kind": "const",
+              "path_prefix": "home-mixer/query_hydrators/"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q25",
+      "kind": "answer",
+      "source": "P1b-007",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the ThunderMaxResults parameter at the pinned commit?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])(?<!\\d,)1,?200(\\.0+)?(?![\\d])(?!,\\d)(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 23,
+            "end_line": 28,
+            "anchor": "ThunderMaxResults",
+            "span_sha256": "021a2db35e0d548e7103280894d96072af6353a848e19462ffd39a5a6fe0e0ab",
+            "lookup": {
+              "tool": "get_param",
+              "name": "ThunderMaxResults",
+              "value": "1200"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q26",
+      "kind": "answer",
+      "source": "P1b-008",
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "In thunder/config.rs at the pinned commit, what are the per-author caps for original posts and for reply posts (MAX_ORIGINAL_POSTS_PER_AUTHOR and MAX_REPLY_POSTS_PER_AUTHOR)?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])50(\\.0+)?(?![\\d])(?!\\.\\d)",
+          "(?<![\\d.])30(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "thunder/config.rs",
+            "start_line": 5,
+            "end_line": 6,
+            "anchor": "MAX_REPLY_POSTS_PER_AUTHOR",
+            "span_sha256": "e16918144b86b927b78ae97b1ccc416f3f82e3bfa0070a485cd9dcc069943ebe",
+            "lookup": {
+              "tool": "find_symbols",
+              "name": "MAX_REPLY_POSTS_PER_AUTHOR",
+              "kind": "const",
+              "path_prefix": "thunder/"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q27",
+      "kind": "answer",
+      "source": "P1b-010",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the PhoenixMaxResults parameter at the pinned commit?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])(?<!\\d,)1,?000(\\.0+)?(?![\\d])(?!,\\d)(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 4,
+            "end_line": 9,
+            "anchor": "PhoenixMaxResults",
+            "span_sha256": "4f55130e09046789f7567d8d409700f3002c8298c13ef133776a079dc50b0ed1",
+            "lookup": {
+              "tool": "get_param",
+              "name": "PhoenixMaxResults",
+              "value": "1000"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q28",
+      "kind": "answer",
+      "source": "P1b-012",
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the value of the MAX_RESULTS constant in home-mixer/sources/simclusters_source.rs at the pinned commit?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])800(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/sources/simclusters_source.rs",
+            "start_line": 25,
+            "end_line": 25,
+            "anchor": "MAX_RESULTS",
+            "span_sha256": "7c67b2f0517a940d20966abb171a31ffda9fa68e46fa71e9a2fe81197e58c629",
+            "lookup": {
+              "tool": "find_symbols",
+              "name": "MAX_RESULTS",
+              "kind": "const",
+              "path_prefix": "home-mixer/sources/simclusters_source.rs"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q29",
+      "kind": "answer",
+      "source": "P1b-024",
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the value of PHOENIX_CLIENT_MAX_CANDIDATES in home-mixer/util/phoenix_request.rs at the pinned commit?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])(?<!\\d,)2,?800(\\.0+)?(?![\\d])(?!,\\d)(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/util/phoenix_request.rs",
+            "start_line": 15,
+            "end_line": 15,
+            "anchor": "PHOENIX_CLIENT_MAX_CANDIDATES",
+            "span_sha256": "c2324a9c69c138523c2478f7eb41f9ea942afb2169176e044e59411e9b371267",
+            "lookup": {
+              "tool": "find_symbols",
+              "name": "PHOENIX_CLIENT_MAX_CANDIDATES",
+              "kind": "const",
+              "path_prefix": "home-mixer/util/"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q30",
+      "kind": "answer",
+      "source": "P1b-032",
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "In home-mixer/params/config.rs at the pinned commit, what are the values of TOP_K_CANDIDATES_TO_SELECT and RESULT_SIZE?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.])50(\\.0+)?(?![\\d])(?!\\.\\d)",
+          "(?<![\\d.])35(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/config.rs",
+            "start_line": 17,
+            "end_line": 18,
+            "anchor": "TOP_K_CANDIDATES_TO_SELECT",
+            "span_sha256": "35fb0b6f7705161cfd19f30357e9a2647cf5f48cf62a23b127480e9242050e41",
+            "lookup": {
+              "tool": "find_symbols",
+              "name": "TOP_K_CANDIDATES_TO_SELECT",
+              "kind": "const",
+              "path_prefix": "home-mixer/params/config.rs"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "Q31",
+      "kind": "answer",
+      "source": "P4-006",
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Across the pinned commits (4c5cfe8, a707cc2, 77d431a), did the public default of ClickWeight change? Give the old and new values and the commit at which the declarations changed.",
+      "expected": {
+        "answer_regexes": [
+          "0\\.4",
+          "0\\.3",
+          "a707cc2"
+        ],
+        "citations": [
+          {
+            "commit": "a707cc27ba36d3fa79450c9cffcc48a82d080b02",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 329,
+            "end_line": 329,
+            "anchor": "ClickWeight",
+            "span_sha256": "4b5c535dbf7b2b6ac766b2405034e203e934bee70377b44d0899c8923b2fe28c"
+          },
+          {
+            "commit": "a707cc27ba36d3fa79450c9cffcc48a82d080b02",
+            "path": "vm-ranker/params.rs",
+            "start_line": 18,
+            "end_line": 18,
+            "anchor": "ClickWeight",
+            "span_sha256": "4b5c535dbf7b2b6ac766b2405034e203e934bee70377b44d0899c8923b2fe28c"
+          },
+          {
+            "commit": "4c5cfe8f07f1c76d4f04277e803f20e6039f5191",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 322,
+            "end_line": 322,
+            "anchor": "ClickWeight",
+            "span_sha256": "b01734cae3e1124eb6a960d8e84b2a8d8d7df35bc2c009bb6f9880e29e16b16a"
+          },
+          {
+            "commit": "4c5cfe8f07f1c76d4f04277e803f20e6039f5191",
+            "path": "vm-ranker/params.rs",
+            "start_line": 18,
+            "end_line": 18,
+            "anchor": "ClickWeight",
+            "span_sha256": "b01734cae3e1124eb6a960d8e84b2a8d8d7df35bc2c009bb6f9880e29e16b16a"
+          }
+        ]
+      }
+    },
+    {
+      "id": "A01",
+      "kind": "abstain",
+      "source": null,
+      "evidence_class": "EMPIRICAL",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What value of rust_home_mixer_click_weight is X's production configuration system serving right now?",
+      "expected": {
+        "abstention_reason": "production value: the repository holds public defaults mirrored from a configuration system; live values are not in the code",
+        "probes": [
+          {
+            "query": "production ClickWeight"
+          },
+          {
+            "query": "live click_weight value"
+          }
+        ]
+      }
+    },
+    {
+      "id": "A02",
+      "kind": "abstain",
+      "source": null,
+      "evidence_class": "EMPIRICAL",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the probability that a specific viewer will like a specific post in their For You feed?",
+      "expected": {
+        "abstention_reason": "per-viewer model output: no trained model, no request data and no inference results are in the repository",
+        "probes": [
+          {
+            "query": "per-viewer probability",
+            "literal": true
+          },
+          {
+            "query": "viewer like probability value"
+          }
+        ]
+      }
+    },
+    {
+      "id": "A03",
+      "kind": "abstain",
+      "source": null,
+      "evidence_class": "OFFICIAL",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "How much advertising revenue does the For You feed generate per day?",
+      "expected": {
+        "abstention_reason": "revenue: financial figures are not in the public code",
+        "probes": [
+          {
+            "query": "revenue"
+          }
+        ]
+      }
+    },
+    {
+      "id": "A04",
+      "kind": "abstain",
+      "source": null,
+      "evidence_class": "OFFICIAL",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the creator payout per thousand impressions under X's revenue sharing programme?",
+      "expected": {
+        "abstention_reason": "payout rate: programme terms and rates are not in the public code",
+        "probes": [
+          {
+            "query": "payout"
+          },
+          {
+            "query": "revenue sharing",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "A05",
+      "kind": "abstain",
+      "source": null,
+      "evidence_class": "EMPIRICAL",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "How many impressions will a post published at 09:00 UTC tomorrow receive?",
+      "expected": {
+        "abstention_reason": "reach prediction: the tool makes no predictions and the code contains no forecast of impressions for a post",
+        "probes": [
+          {
+            "query": "predicted impressions",
+            "literal": true
+          },
+          {
+            "query": "impressions forecast"
+          }
+        ]
+      }
+    },
+    {
+      "id": "A06",
+      "kind": "abstain",
+      "source": null,
+      "evidence_class": "EMPIRICAL",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Does the home mixer shadowban accounts that post external links?",
+      "expected": {
+        "abstention_reason": "no supporting span: 'shadowban' does not occur in the code; a weight for link opens is not evidence of suppression, and absence of a term is not evidence either way",
+        "probes": [
+          {
+            "query": "shadowban"
+          },
+          {
+            "query": "shadow ban",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "A07",
+      "kind": "abstain",
+      "source": null,
+      "evidence_class": "EMPIRICAL",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Which experiment bucket is my account assigned to for the Phoenix cold-start source?",
+      "expected": {
+        "abstention_reason": "per-account experiment assignment: live experiment data is not in the public code",
+        "probes": [
+          {
+            "query": "experiment bucket account"
+          },
+          {
+            "query": "my account",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "A08",
+      "kind": "abstain",
+      "source": "P5-067",
+      "evidence_class": "OFFICIAL",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Do X's current Terms of Service allow automated scraping of public timelines?",
+      "expected": {
+        "abstention_reason": "official external document: the terms are not part of the pinned repository (the finding's evidence class is OFFICIAL and it is time-bounded)",
+        "probes": [
+          {
+            "query": "scraping"
+          },
+          {
+            "query": "Terms of Service crawling"
+          }
+        ]
+      }
+    },
+    {
+      "id": "A09",
+      "kind": "abstain",
+      "source": null,
+      "evidence_class": "EMPIRICAL",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What are the numeric values of the trained weights in the Phoenix ranking model's final output layer at the pinned commit?",
+      "expected": {
+        "abstention_reason": "model weights: the repository holds model code, not trained checkpoints or their values",
+        "probes": [
+          {
+            "query": "output layer weights",
+            "literal": true
+          },
+          {
+            "query": "trained weight values"
+          }
+        ]
+      }
+    }
+  ],
+  "revision": {
+    "number": 2,
+    "date": "2026-10-07",
+    "base": {
+      "file": "eval/questions.json",
+      "number": 1,
+      "sha256": "e4e451e3c8eb3fe51b8562766b9f092e35d1980118d05aac4c92671d4ef90096",
+      "status": "root-reviewed 2026-10-01"
+    },
+    "thresholds": "unchanged: docs/release-checklist.md, \"Gate rule\" (root-reviewed 2026-10-01)",
+    "summary": "Corrections to items whose expected answers rejected a correct reply: Q05 and Q22 as analysed after the second live run, and patterns found by reading that required an order the question does not ask for, an exact identifier spelling or no thousands separator. No question text, abstain item, probe, threshold or existing expected citation changed; revision 1 and its live-run results stay as recorded.",
+    "changes": [
+      {
+        "id": "Q01",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "reading",
+        "reason": "Source names written with a space or hyphen (\"Tweet Mixer\", \"Phoenix Topics\", \"Phoenix MoE\") name the same sources; the order requirement stays because the question asks for the order.",
+        "before": [
+          "(?s)thunder.*tweet_?mixer.*simclusters.*phoenix.*phoenix_?topics.*phoenix_?moe.*cached"
+        ],
+        "after": [
+          "(?s)thunder.*tweet[ _-]?mixer.*sim[ _-]?clusters.*phoenix.*phoenix[ _-]?topics.*phoenix[ _-]?moe.*cached"
+        ]
+      },
+      {
+        "id": "Q02",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "reading",
+        "reason": "The question asks which two filters come last, not in which order, so the two names are separate patterns (v1 required InventoryHoldoutFilter before FavHoldoutFilter); the names may drop the Filter suffix or use a separator.",
+        "before": [
+          "\\b(19|nineteen)\\b",
+          "(?s)InventoryHoldoutFilter.*FavHoldoutFilter"
+        ],
+        "after": [
+          "\\b(19|nineteen)\\b",
+          "Inventory[ _-]?Holdout",
+          "Fav(?:orite)?[ _-]?Holdout"
+        ]
+      },
+      {
+        "id": "Q03",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "reading",
+        "reason": "\"Phoenix scorer\" and \"VM ranker\" name the same objects as phoenix_scorer and vm_ranker; the order requirement stays because the question asks for the order.",
+        "before": [
+          "(?s)phoenix_?scorer.*vm_?ranker"
+        ],
+        "after": [
+          "(?s)phoenix[ _-]?scorer.*vm[ _-]?ranker"
+        ]
+      },
+      {
+        "id": "Q04",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "reading",
+        "reason": "The question asks which filters are registered, not in which order, so each filter is its own pattern (v1 required the registration order); separators are allowed. \\bVF still does not match inside AncillaryVFFilter.",
+        "before": [
+          "(?s)\\bVFFilter\\b.*AncillaryVFFilter.*DedupConversationFilter"
+        ],
+        "after": [
+          "\\bVF[ _-]?Filter",
+          "Ancillary[ _-]?VF(?:[ _-]?Filter)?",
+          "Dedup\\w*[ _-]?Conversation"
+        ]
+      },
+      {
+        "id": "Q05",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "second live run 2026-10-02, root analysis (docs/release-checklist.md, section 3a)",
+        "reason": "The four conditions may be stated in prose (\"in-network-only\", \"cached posts\") as well as with the identifiers in_network_only and has_cached_posts; v1 required the identifiers literally and rejected a correct prose reply.",
+        "before": [
+          "EnablePhoenixSource",
+          "topic",
+          "in_network_only",
+          "has_cached_posts"
+        ],
+        "after": [
+          "Enable[ _-]?Phoenix[ _-]?Source",
+          "topic",
+          "in[ _-]?network[ _-]?only",
+          "cached[ _-]?posts"
+        ]
+      },
+      {
+        "id": "Q15",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "reading",
+        "reason": "A negative public default may be written with an en dash or the word \"negative\" as well as with a hyphen-minus, a minus sign or \"minus\".",
+        "before": [
+          "(?<![\\d.])(-|−|minus\\s*)47\\.520*(?![\\d])(?!\\.\\d)"
+        ],
+        "after": [
+          "(?<![\\d.])(-|−|–|minus\\s*|negative\\s+)47\\.520*(?![\\d])(?!\\.\\d)"
+        ]
+      },
+      {
+        "id": "Q16",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "reading",
+        "reason": "A negative public default may be written with an en dash or the word \"negative\" as well as with a hyphen-minus, a minus sign or \"minus\".",
+        "before": [
+          "(?<![\\d.])(-|−|minus\\s*)31\\.20*(?![\\d])(?!\\.\\d)"
+        ],
+        "after": [
+          "(?<![\\d.])(-|−|–|minus\\s*|negative\\s+)31\\.20*(?![\\d])(?!\\.\\d)"
+        ]
+      },
+      {
+        "id": "Q17",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "reading",
+        "reason": "A negative public default may be written with an en dash or the word \"negative\" as well as with a hyphen-minus, a minus sign or \"minus\".",
+        "before": [
+          "(?<![\\d.])(-|−|minus\\s*)58\\.80*(?![\\d])(?!\\.\\d)"
+        ],
+        "after": [
+          "(?<![\\d.])(-|−|–|minus\\s*|negative\\s+)58\\.80*(?![\\d])(?!\\.\\d)"
+        ]
+      },
+      {
+        "id": "Q18",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "reading",
+        "reason": "A negative public default may be written with an en dash or the word \"negative\" as well as with a hyphen-minus, a minus sign or \"minus\".",
+        "before": [
+          "(?<![\\d.])(-|−|minus\\s*)234(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ],
+        "after": [
+          "(?<![\\d.])(-|−|–|minus\\s*|negative\\s+)234(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ]
+      },
+      {
+        "id": "Q19",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "reading",
+        "reason": "A negative public default may be written with an en dash or the word \"negative\" as well as with a hyphen-minus, a minus sign or \"minus\".",
+        "before": [
+          "(?<![\\d.])(-|−|minus\\s*)0\\.020*(?![\\d])(?!\\.\\d)"
+        ],
+        "after": [
+          "(?<![\\d.])(-|−|–|minus\\s*|negative\\s+)0\\.020*(?![\\d])(?!\\.\\d)"
+        ]
+      },
+      {
+        "id": "Q20",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "reading",
+        "reason": "total_sum adds the two sums; the order of the operands is not asked, and \"positive sum\" names positive_sum. v1 already accepted both orders in one alternation.",
+        "before": [
+          "(?s)positive_sum.*negative_sum|negative_sum.*positive_sum"
+        ],
+        "after": [
+          "positive[ _-]?sum",
+          "negative[ _-]?sum"
+        ]
+      },
+      {
+        "id": "Q21",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "reading",
+        "reason": "\"share source tweet id\" and \"null-cast\" name the same record fields.",
+        "before": [
+          "shareSourceTweetId",
+          "nullcast"
+        ],
+        "after": [
+          "share[ _-]?source[ _-]?tweet[ _-]?id",
+          "null[ _-]?cast"
+        ]
+      },
+      {
+        "id": "Q22",
+        "fields": [
+          "expected.citations",
+          "expected.answer_regexes"
+        ],
+        "basis": "second live run 2026-10-02, root analysis (docs/release-checklist.md, section 3a)",
+        "reason": "The same expression initialTweetId.getOrElse(...) occurs twice in the file at 77d431a, at line 200 (the flag-count job) and at line 227 (loadPosts); a reply citing either span cites the derivation, so line 227 is added as a second expected citation (span hash by plain git show). The question asks only about an edited post, whose logical id is its initial post id; getOrElse is the fallback for an unedited post, which the question does not ask about, so the pattern requires the initial post id only (as an identifier or in prose).",
+        "before": {
+          "answer_regexes": [
+            "initialTweetId",
+            "getOrElse"
+          ],
+          "citations": 1
+        },
+        "after": {
+          "answer_regexes": [
+            "initial[ _-]?(?:tweet|post)[ _-]?id"
+          ],
+          "citations": 2
+        }
+      },
+      {
+        "id": "Q25",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "reading",
+        "reason": "A thousands separator (\"1,200\") states the same public default; the lookarounds still reject a longer number such as 1,200,000 or 12000.",
+        "before": [
+          "(?<![\\d.])1200(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ],
+        "after": [
+          "(?<![\\d.])(?<!\\d,)1,?200(\\.0+)?(?![\\d])(?!,\\d)(?!\\.\\d)"
+        ]
+      },
+      {
+        "id": "Q27",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "reading",
+        "reason": "A thousands separator (\"1,000\") states the same public default; the lookarounds still reject a longer number such as 1,000,000 or 10000.",
+        "before": [
+          "(?<![\\d.])1000(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ],
+        "after": [
+          "(?<![\\d.])(?<!\\d,)1,?000(\\.0+)?(?![\\d])(?!,\\d)(?!\\.\\d)"
+        ]
+      },
+      {
+        "id": "Q29",
+        "fields": [
+          "expected.answer_regexes"
+        ],
+        "basis": "reading",
+        "reason": "A thousands separator (\"2,800\") states the same public default; the lookarounds still reject a longer number such as 2,800,000 or 28000.",
+        "before": [
+          "(?<![\\d.])2800(\\.0+)?(?![\\d])(?!\\.\\d)"
+        ],
+        "after": [
+          "(?<![\\d.])(?<!\\d,)2,?800(\\.0+)?(?![\\d])(?!,\\d)(?!\\.\\d)"
+        ]
+      }
+    ]
+  }
+}

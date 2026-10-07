@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from ..findings import ACTIVE_WORKFLOWS, VERIFIER_ACTOR, Actor, FindingsMemory
+from ..findings.stale import worklist
 from ..verify import NOT_CHECKED
 
 EVERY_ACTIVE = "every active finding"
@@ -56,6 +57,10 @@ class LedgerRefresh:
     removed: list[dict[str, Any]] = field(default_factory=list)
     ledger_head: str = ""
     ledger_events: int = 0
+    #: The stale-review summary at the target (:meth:`Worklist.summary`): counts by area and
+    #: outcome, the batch steps (unpinned cited commits, findings without a check) and the
+    #: next command; its order is also the order in which ``added`` is printed.
+    stale_review: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -70,6 +75,7 @@ class LedgerRefresh:
                 "removed": [_brief(item) for item in self.removed],
             },
             "ledger": {"head": self.ledger_head, "events": self.ledger_events},
+            "stale_review": self.stale_review,
         }
 
 
@@ -100,6 +106,12 @@ def refresh_ledger(
     after = after_view.queue()
     before_keys = {queue_key(item) for item in before}
     after_keys = {queue_key(item) for item in after}
+    work = worklist(memory, full)
+    ranks = {entry["finding_id"]: entry["rank"] for entry in work.entries}
+    added = [item for item in after if queue_key(item) not in before_keys]
+    # the worklist order (parameter findings, then scoring paths, then the rest)
+    added.sort(key=lambda item: (ranks.get(item["finding_id"], len(ranks) + 1),
+                                 item["priority"], item["finding_id"], item["trigger"]))
     return LedgerRefresh(
         target=full,
         selection=selection,
@@ -107,10 +119,11 @@ def refresh_ledger(
         freshness={str(key): int(value) for key, value in report["freshness"].items()},
         queue_before=len(before),
         queue_after=len(after),
-        added=[item for item in after if queue_key(item) not in before_keys],
+        added=added,
         removed=[item for item in before if queue_key(item) not in after_keys],
         ledger_head=after_view.head,
         ledger_events=after_view.events,
+        stale_review=work.summary(),
     )
 
 

@@ -2,6 +2,120 @@
 
 All notable changes to this project are recorded here. Versions follow PEP 440.
 
+## [Unreleased]
+
+### Measured
+
+- Third live run of the semantic gate (2026-10-07, set revision 2, haiku, USD 1.39):
+  precision 31/32 = 0.969 and coverage 31/31 pass, abstention 7/9 and one turn-limit error
+  fail, so the gate still fails (`eval/live-run-2026-10-07.txt`,
+  docs/release-checklist.md, "Third live run"). No item was re-scored.
+
+### Added
+
+- **`txray findings stale [--target C] [--limit N] [--spec-dir DIR] [--json]`**
+  (`timelinexray/findings/stale.py`): a read-only, prioritised re-review list of every
+  active finding that is not `CURRENT` at the target (default: the newest pin). Each entry
+  shows the old span (commit, path, lines, span SHA-256, anchor), the outcome and the span
+  the tool located or line-diff-aligned at the target with its SHA-256 and anchor verdict
+  (every occurrence for an ambiguous span, the searched scope for a missing one), and the
+  exact commands: `txray show` for both spans, then supersede (with a successor draft),
+  verify and review by a different reviewer, or review at the target as it is, or retract.
+  Order: parameter findings, then findings on scoring paths (the digest's scoring-name
+  rule), then the rest; then the queue's trigger priority (a mechanical order, stated as
+  such). Findings whose only problem is an unpinned cited commit, or that have no check at
+  the target, are batched into one command each. `--spec-dir` writes successor
+  specifications whose citations carry the expected `span_sha256` and whose
+  `remove_after_reading` member makes `supersede --file` refuse the draft until an author
+  has read the spans and edited the copied claim; refused inside a git working tree. It
+  writes no ledger event, approves nothing and moves no evidence. Measured on the 275
+  research findings re-anchored on `78460ca` (dogfood of 0.10.0): 67 entries (3 parameter,
+  17 scoring, 47 other), 53 drafts possible, one batch step for 18 findings.
+- **`txray findings verify --pin-cited [--upstream URL]`**: one command for imported
+  citations of commits the store has not pinned. It pins them exactly as `txray pin` (the
+  guarded fetch only when the mirror lacks the commit), verifies the affected findings and
+  re-anchors them again on every target whose earlier check was made from the unresolved
+  citations. Dogfood: 8 commits pinned (none fetched), 18 findings resolved in 2 s;
+  freshness at `78460ca` went from CURRENT 190 / STALE 60 / UNVERIFIABLE 25 to CURRENT 192
+  / STALE 74 / UNVERIFIABLE 9 (the 9 left are research citations that are unusable at their
+  own commit or a file gone at the target). A plain `verify` that leaves unpinned commits
+  prints the command.
+- **`txray findings reanchor --summary`**: totals, the first ten worklist entries, the
+  batch steps and `next txray findings stale` instead of one line per finding (16 lines
+  instead of 278 on the dogfood); without it the same summary follows the per-finding
+  lines, and `--json` carries it as `stale_review`.
+- **Semantic gate set revision 2** (`eval/questions-v2.json`, status *root-reviewed 2026-10-07*):
+  a new file with a top-level `revision` record (base revision 1 by file, number and SHA-256;
+  thresholds unchanged; one change per item with its fields, basis and reason, and the values
+  before and after). It corrects 16 answer items whose expected answers rejected a correct
+  reply: Q22 gains the second `initialTweetId.getOrElse` span (line 227) as an expected
+  citation and Q05 accepts the prose forms of its conditions (both from the root analysis of
+  the second live run); by reading, Q02 and Q04 drop an order their questions do not ask for,
+  identifier patterns accept a space or hyphen, three counts accept a thousands separator and
+  the negative weights accept an en dash or "negative". No question text, abstain item, probe,
+  threshold or existing expected citation changed; `eval/questions.json` (revision 1) and its
+  live-run reports are unchanged, and `tests/test_eval_gate.py` pins its SHA-256, fails when
+  revision 2 differs from it outside the listed fields, and checks every changed pattern with
+  synthetic correct and wrong replies. `run_gate.py` and `live_gate.py` default to the newest
+  revision, validate the `revision` record and print and record the revision they used; the
+  deterministic harness runs on both revisions in `make ci` (revision 2: 237 / 237 checks).
+  No live run was made.
+
+### Changed
+
+- **`txray update --reanchor`** prints the first ten new review items in the worklist
+  order (then `... and N more`; `update-status.json` lists all of them), a `review` line
+  with the exact `txray findings stale` command and an `unpinned` line with `txray findings
+  verify --pin-cited` when needed; `ledger_refresh.stale_review` records the summary
+  (additive). On `77d431a..78460ca` with the research ledger: 86 new items printed as 11
+  lines instead of 86.
+- **Import hint**: the report of `txray findings import` names `txray findings verify
+  --pin-cited --label LABEL`. It used to print `txray pin C1 C2 ...; then txray findings
+  verify --label LABEL`, but `txray pin` takes one commit, so the printed command exited 2.
+- `tests/test_repo_hygiene.py` accepts an `Unreleased` section above the first released
+  version in this file (the released section must still equal the package version).
+- **The digest is two Markdown files, summary first and bounded** (`timelinexray/digest/render.py`).
+  `digest-<old>-<new>.md` opens with *At a glance* (files, lines, parameter, registration,
+  `scoring-logic` and `unknown` counts with how they were decided, events, affected findings,
+  what the file does not list and what was cut) and *What to check next* (exact commands),
+  then the statements, parameter defaults, registrations, `scoring-logic` items grouped by
+  file, affected findings, the summary by class (with "listed in" and "must not be read
+  as"), every other class counted by area, unknown items counted by reason and area, range,
+  events, history and health. Citations in the main file are compact (lines and span
+  SHA-256; the commit is named once per section); every section has a row budget and says
+  what it moved. `digest-<old>-<new>-appendix.md` lists every item the main file only counts,
+  by class, area and file, with both citations, the unknown reason or the deciding rule, and
+  every cut table row. `txray digest --format md|appendix|json` (with `--out`, `md` writes
+  both Markdown files); `txray update` writes all three and prints the item, parameter and
+  unknown counts. The JSON document is unchanged in schema and complete; it gains
+  `overview.classes` (items, files, lines, areas, `listed_in`, `decided_by`, `reasons`) and
+  `classes[].must_not_be_read_as`; `update-status.json` gains `digest_summary`. Measured on
+  `77d431a..78460ca`: main digest 461,450 -> 39,991 bytes (appendix 422,982, JSON 2,293,334);
+  on `aaa167b..77d431a` the main digest is 68,360 bytes with its cuts named.
+- **Change classifier version 2** (`timelinexray/diff/rules.py`, `engine.py`, `analysis.py`),
+  every rule with synthetic fixture tests (`tests/test_diff.py`, `ClassifierV2Test`):
+  - new class `build-dependency`: build-system and dependency files by name (`BUILD`,
+    `*.bazel`, `*.bzl`, `Cargo.toml`, `build.rs`, `pyproject.toml`, `requirements*.txt`,
+    `Makefile`, `Dockerfile`, ...), and hunks whose every changed code line is an import,
+    `use`, `extern crate`, bodyless `mod` or `package` declaration (Milestone 2 symbols);
+  - `model-config` also covers a `train/` directory; `test-only` also covers
+    `test_support.*`, `test_helpers.*` and `*_fixtures.*`;
+  - `detail.unknown_reason` on every `unknown` item (`no-rule`, `not-parsed` for C, C++,
+    CUDA, shell and other languages without symbol extraction, `not-text`, `mode-only`), and
+    `detail.matched_by` (the deciding `path` or `symbol` rule and name) on every
+    `scoring-logic` and `model-config` item;
+  - class descriptions say which rules are name or path heuristics.
+  A seeded hand check (seeds 20261007 and 20261008, 42 items the kept rules move out of
+  `unknown`, each hunk read at both commits): build files 1/1, import hunks 22/22, `train`
+  18/18, test helper names 1/1 correct. A
+  filtering/visibility name rule was tried and **rejected** (37 distinct sampled items: 10
+  rule or policy logic, 8 hydration inputs, 19 caches, telemetry, wiring or tooling); that code stays
+  `unknown`. Measured on `77d431a..78460ca`: `unknown` 610 -> 469 of 1,227 net items (188
+  hunks to `build-dependency`, 137 to `model-config`, 1 to `test-only`); the only hunks that
+  left another class are import-only hunks (17 from `scoring-logic`, 46 from
+  `model-config`) and build manifests such as `Cargo.toml` that were `model-config` by
+  extension. On `aaa167b..77d431a`: `unknown` 1,522 -> 1,381.
+
 ## [0.10.0] - 2026-10-02 - One-command install
 
 Two commands from nothing to a cited answer: `install.sh`, then `txray setup`. Also the

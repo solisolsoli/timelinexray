@@ -11,8 +11,9 @@ txray findings add        --actor NAME (--file SPEC.json | --title ... --cite C 
 txray findings import     FILE --source-label LABEL --actor NAME
 txray findings list       [--workflow W] [--status S] [--freshness F] [--target C] [--label L] [--current] [--all]
 txray findings show       ID [--target C]
-txray findings verify     [ID ...] [--label L]
-txray findings reanchor   (TARGET | --latest) [ID ...] [--strict]
+txray findings verify     [ID ...] [--label L] [--pin-cited [--upstream URL]]
+txray findings reanchor   (TARGET | --latest) [ID ...] [--strict] [--summary]
+txray findings stale      [--target C] [--limit N] [--spec-dir DIR]
 txray findings review     ID --actor NAME --role reviewer --status S --rationale TEXT [--objection TEXT] [--target C]
 txray findings supersede  ID --actor NAME (--by ID | --file SPEC.json) --rationale TEXT
 txray findings retract    ID --actor NAME --reason TEXT
@@ -183,7 +184,7 @@ itself is never changed, and `show`, the MCP tools and the export display the re
 (`show` marks it `resolved by a later verify`, with a hash and a permalink where the
 export has one). Re-anchoring checks made before the resolution were made from the
 unresolved citation and no longer count: `verify` reports them as `recheck_targets` and
-prints the `reanchor` command to run again. `verify --label L` restricts the check to the
+prints the `reanchor` command to run again (`verify --pin-cited` re-anchors them itself). `verify --label L` restricts the check to the
 findings imported with label `L`.
 
 The anchor verdict (`FOUND` once in the span, `FOUND_MULTIPLE` several times in the span,
@@ -246,6 +247,86 @@ byte for byte in the target:
 - The finding's freshness is the worst of its parts: `STALE` before `UNVERIFIABLE` before
   `CURRENT`.
 
+After re-anchoring, `reanchor` ends with a summary: the number of findings to re-review
+at the target by area and outcome, the first ten of them in worklist order, the batch steps
+below and `next txray findings stale --target C`; `--summary` prints only that summary
+instead of one line per finding (on the 275 research findings re-anchored on `78460ca`: 16
+lines instead of 278). `--json` adds the same summary as `stale_review`.
+
+## Stale review: what to re-read first
+
+`txray findings stale [--target C]` (default: the newest pin) turns the recorded checks
+into a worklist for a reviewer (`timelinexray/findings/stale.py`). It reads the ledger and
+the pins only: it writes no event, approves nothing and moves no evidence. Freshness is not
+truth.
+
+- **One entry per finding** that is active, has checkable evidence and is not `CURRENT` at
+  the target: freshness, area, evidence class, status (with its basis) and workflow, and
+  for every non-current citation the **old span** (commit, path, lines, span SHA-256,
+  anchor), the outcome and what the tool knows at the target: for `changed`, the
+  **aligned candidate span** of the line diff with its SHA-256, its anchor verdict and the
+  method (a proposal, not a check); for `ambiguous`, every occurrence; for `missing`, the
+  searched scope; for `unusable`, the reason. Non-current dependencies and a negative
+  search with hits are listed too.
+- **Order**: area first (`parameter`: a `PARAM_DEFAULT` finding; `scoring`: a cited path or
+  the component matches the digest's scoring-name rule, the one that classifies
+  `scoring-logic`; `other`), then the trigger priority of the queue (a changed span before
+  an ambiguous or missing one), then the id. The order is a mechanical heuristic for where
+  to look first, not a judgement of importance; every entry is listed.
+- **Commands** for each entry, with the `--store`/`--ledger` of the run: `txray show` for
+  the old span and for each candidate (with `--anchor`), then the three decisions:
+  1. the claim still holds at the target: edit the drafted successor, then
+     `txray findings supersede ID --actor AUTHOR --file SPEC`, `txray findings verify
+     SUCCESSOR` and a review of the successor by a different reviewer;
+  2. assessed as it is: `txray findings review ID ... --target C` (closes the target's
+     items; the finding stays not current at C);
+  3. withdrawn: `txray findings retract ID ...`.
+  `AUTHOR`, `REVIEWER`, `STATUS`, `RATIONALE` and `REASON` are placeholders for a person to
+  fill in.
+- **Batch steps** instead of per-finding entries: findings whose only problem is a cited
+  commit the store has not pinned (`txray findings verify --pin-cited`, below), and
+  findings without a recorded check at the target (`txray findings reanchor C`).
+- **Successor drafts** (`--spec-dir DIR`): for every entry whose citations all have a
+  single location at the target (unchanged, moved, or a line-diff-aligned span whose anchor
+  is still `FOUND` or `FOUND_MULTIPLE` in it), a specification file `<id>.<target7>.json`:
+  the citations moved to those spans, each with its expected `span_sha256` (the write gate
+  re-reads the span and refuses a mismatch), finding dependencies and web sources kept, the
+  claim, title and status copied unchanged with a limitation saying so, and a member
+  `remove_after_reading` that is not a specification key, so `supersede --file` refuses the
+  draft until an author has read the spans, corrected the claim and deleted it. No draft is
+  written for an ambiguous, missing or unusable citation, an aligned span that lost its
+  anchor (the anchor text itself changed), a span dependency or a negative search: those
+  are re-cited by hand. The directory is refused inside a git working tree (drafts copy
+  claims), inside the store or the ledger, and like every output directory.
+
+On the research findings of the 0.10.0 dogfood (275 findings re-anchored on `78460ca`):
+67 entries to re-review (3 parameter, 17 scoring, 47 other; 86 changed spans and 11
+unusable citations), 53 successor drafts possible, and one batch step for the 18 findings
+whose citations name 8 unpinned commits. After `verify --pin-cited`: 83 entries (17
+parameter), none batched.
+
+## Unpinned citations: one command
+
+An imported citation of a commit the store has not pinned cannot be read (`MISSING`,
+`commit_not_pinned`), so the finding is `UNVERIFIABLE`, at its cited commit and at every
+target. `txray findings verify --pin-cited [--label L | ID ...] [--upstream URL]` fixes it
+in one step:
+
+1. it pins every commit the selected findings (default: every active finding) cite that
+   the store has not pinned, exactly as `txray pin` (the guarded fetch from the allowlisted
+   upstream runs only when the mirror does not hold the commit; the upstream is the store's
+   own, or `--upstream`);
+2. it runs the integrity check of the findings whose citations were unresolved (with
+   `--label` or ids: of the selection), which resolves the citations as a provenance
+   revision (the record never changes);
+3. it re-anchors those findings again on every target whose earlier check was made from the
+   unresolved citations (`recheck_targets`), so their freshness at the newest pin is
+   recorded at once.
+
+Freshness changes; statuses never do. `import`, a plain `verify`, `reanchor`, `stale` and
+`update --reanchor` print this command when citations name unpinned commits. (`txray pin`
+takes one commit; the import hint of 0.10.0 printed `txray pin C1 C2 ...`, which exits 2.)
+
 ## Review, supersession and retraction
 
 - `review` records an assessed status with a rationale and optional objections; it is the
@@ -284,7 +365,8 @@ does when the log is replayed.
 | 4 | `awaiting_review_imported` (only with `--include-imported`) |
 
 Allowed actions for every item: review, supersede with a revised finding citing the target,
-retract, or leave it unresolved.
+retract, or leave it unresolved. `txray findings stale` lists the same work per finding, in
+the area order above, with the spans and the commands.
 
 ## Adding a finding: the write gate
 
@@ -337,9 +419,10 @@ be JSON, YAML, or Markdown with exactly one fenced block starting with `findings
   an anchor `MISSING` from its span makes the imported finding `UNVERIFIABLE` until it is
   superseded by a corrected citation.
 - The report lists the distinct commits the store has not pinned (`unpinned_commits`,
-  citations per commit) with the command that resolves them (`hint`: `txray pin <commits>`,
-  then `txray findings verify --label LABEL`); the human output prints them as `unpinned`
-  and `next`. Resolving later never edits the record (see "Verification").
+  citations per commit) with the one command that resolves them (`hint`: `txray findings
+  verify --pin-cited --label LABEL`, see "Unpinned citations: one command"); the human
+  output prints them as `unpinned` and `next`. Resolving later never edits the record (see
+  "Verification").
 - Importing the same file again is a no-op (identity: the SHA-256 of each finding's
   canonical JSON); changed content under an existing id is refused (supersede instead).
 - `txray findings export --format research --label LABEL` reconstructs the imported data

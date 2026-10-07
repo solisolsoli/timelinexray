@@ -63,11 +63,10 @@ from ..findings import VERIFIER_ACTOR, Actor, FindingsMemory, Ledger
 from ..fsutil import atomic_write, check_output_directory
 from ..netguard import DEFAULT_UPSTREAM_URL, Allowlist, fetch
 from ..snapshot.store import SnapshotStore, validate_commit_input
-from . import digest_filename, digest_json
-from .build import DigestBuilder, upstream_info
+from . import write_digests
+from .build import DigestBuilder, digest_summary, upstream_info
 from .findings import AffectedFindingsProvider, NullFindingsProvider
 from .refresh import LedgerRefresh, refresh_export, refresh_ledger
-from .render import render_markdown
 
 STATE_SCHEMA = "timelinexray/update-state/v1"
 STATUS_SCHEMA = "timelinexray/update-status/v1"
@@ -96,6 +95,7 @@ class UpdateResult:
     status: dict[str, Any] = field(default_factory=dict)
     refresh: LedgerRefresh | None = None
     export: dict[str, Any] | None = None
+    digest: dict[str, Any] | None = None  # digest_summary() of the digest written, if any
 
 
 def state_path(store: SnapshotStore) -> Path:
@@ -279,7 +279,7 @@ def run_update(
         if head not in state.setdefault("quarantined", []):
             state["quarantined"].append(head)
         document = builder.build(previous, head, events=events)
-        result.written = _write_digest(out_dir, document, formats)
+        result.written = _write_digest(out_dir, document, formats, result)
         result.outcome = NEEDS_ATTENTION
         return finish(observed=True)
 
@@ -297,10 +297,10 @@ def run_update(
         document["events"].append(event.to_dict())
         if head not in state.setdefault("quarantined", []):
             state["quarantined"].append(head)
-        result.written = _write_digest(out_dir, document, formats)
+        result.written = _write_digest(out_dir, document, formats, result)
         result.outcome = NEEDS_ATTENTION
         return finish(observed=True)
-    result.written = _write_digest(out_dir, document, formats)
+    result.written = _write_digest(out_dir, document, formats, result)
     state["accepted"] = head
     state["quarantined"] = [c for c in state.get("quarantined", []) if c != head]
     result.accepted = head
@@ -326,15 +326,11 @@ def _previous(
     return newest.commit
 
 
-def _write_digest(out_dir: Path, document: dict[str, Any], formats: tuple[str, ...]) -> list[str]:
-    out_dir.mkdir(exist_ok=True)
-    written = []
-    for fmt in formats:
-        name = digest_filename(document, fmt)
-        text = render_markdown(document) if fmt == "md" else digest_json(document)
-        atomic_write(out_dir / name, text.encode("utf-8"))
-        written.append(name)
-    return written
+def _write_digest(out_dir: Path, document: dict[str, Any], formats: tuple[str, ...],
+                  result: UpdateResult) -> list[str]:
+    """Write the digest (``md`` brings its appendix) and keep its summary for the status."""
+    result.digest = digest_summary(document)
+    return write_digests(out_dir, document, formats)
 
 
 def _finish(
@@ -374,6 +370,7 @@ def _finish(
         "quarantined": list(state.get("quarantined", [])),
         "events": [event.to_dict() for event in result.events],
         "digests": list(result.written),
+        "digest_summary": result.digest,
         "ledger_refresh": result.refresh.to_dict() if result.refresh is not None else None,
         "export": ({key: value for key, value in result.export.items() if key != "message"}
                    if result.export is not None else None),
