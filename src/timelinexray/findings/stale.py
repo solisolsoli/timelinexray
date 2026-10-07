@@ -46,15 +46,19 @@ import os
 import re
 import shlex
 from collections import Counter
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from ..diff.rules import is_scoring_name
-from ..errors import InvalidInput
+from ..errors import InvalidInput, Refused
+from ..snapshot.store import ENV_STORE, default_store_root
 from ..span import CONFIRMING
 from ..verify import CURRENT, NOT_CHECKED, STALE, UNVERIFIABLE
 from .freshness import PinIndex, evaluate
 from .model import MAX_ID, code_citations
+from .service import ENV_FINDINGS, ledger_directory
 from .state import FindingState, View, project
 
 SCHEMA = "timelinexray/stale-review/v1"
@@ -82,6 +86,57 @@ DRAFT_INSTRUCTION = ("Read every cited span at the target (txray show ...), corr
 
 def _cmd(*parts: str) -> str:
     return " ".join(shlex.quote(str(part)) for part in ("txray", *parts))
+
+
+def _same_directory(a: str | os.PathLike[str], b: str | os.PathLike[str]) -> bool:
+    return os.path.realpath(os.path.expanduser(a)) == os.path.realpath(os.path.expanduser(b))
+
+
+@dataclass(frozen=True)
+class Locations:
+    """What a printed command needs to reach the store and ledger of this run.
+
+    ``store_args`` / ``ledger_args`` hold ``--store`` / ``--ledger`` only when the given path
+    is not the one the default resolution finds in this environment (``$TXRAY_STORE`` or
+    the cache default; ``$TXRAY_FINDINGS`` or ``<store>/findings``), so a command without
+    them reaches the same directories. ``exports`` names the variables that make every
+    short command work when an option is needed; :attr:`export_line` is that one line.
+    """
+
+    store_args: list[str] = field(default_factory=list)
+    ledger_args: list[str] = field(default_factory=list)
+    exports: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def export_line(self) -> str | None:
+        if not self.exports:
+            return None
+        return "export " + " ".join(f"{name}={shlex.quote(value)}"
+                                    for name, value in self.exports.items())
+
+
+def locations(store: str | os.PathLike[str] | None, ledger: str | os.PathLike[str] | None,
+              environ: Mapping[str, str] | None = None) -> Locations:
+    """The :class:`Locations` of a run given ``--store`` ``store`` and ``--ledger`` ``ledger``
+    (``None`` when the option was not given)."""
+    environ = os.environ if environ is None else environ
+    default_store = default_store_root(environ)
+    store_root = Path(store).expanduser() if store else default_store
+    store_args: list[str] = []
+    ledger_args: list[str] = []
+    exports: dict[str, str] = {}
+    if store and not _same_directory(store_root, default_store):
+        store_args = ["--store", str(store)]
+        exports[ENV_STORE] = os.path.abspath(store_root)
+    if ledger:
+        try:
+            default_ledger: Path | None = ledger_directory(None, store_root, environ)
+        except Refused:  # the default would lie inside a git working tree
+            default_ledger = None
+        if default_ledger is None or not _same_directory(ledger, default_ledger):
+            ledger_args = ["--ledger", str(ledger)]
+            exports[ENV_FINDINGS] = os.path.abspath(os.path.expanduser(ledger))
+    return Locations(store_args, ledger_args, exports)
 
 
 def area_of(state: FindingState) -> str:
@@ -468,16 +523,29 @@ def worklist(memory: Any, target: str | None = None, *, store_args: list[str] | 
     default the newest pin of the store's upstream). Reads only."""
     pins = PinIndex.of(memory.store)
     if target is None:
-        newest = pins.latest()
-        if newest is None:
-            raise InvalidInput("the store has no single newest pin; give the target commit")
-        full = newest.commit
+        full = newest_target(pins)
     else:
         full = memory.full_commit(target)
-    events = memory.ledger.read_events()
+    return worklist_from_events(memory.ledger.read_events(), pins, full,
+                                store_args=store_args, ledger_args=ledger_args)
+
+
+def newest_target(pins: PinIndex) -> str:
+    """The default target: the newest pin of the store's single upstream."""
+    newest = pins.latest()
+    if newest is None:
+        raise InvalidInput("the store has no single newest pin; give the target commit")
+    return newest.commit
+
+
+def worklist_from_events(events: list[Any], pins: PinIndex, target: str, *,
+                         store_args: list[str] | None = None,
+                         ledger_args: list[str] | None = None) -> Worklist:
+    """The worklist of already chain-checked ledger ``events`` at the full commit ``target``
+    (for readers that open the ledger themselves, such as the MCP server)."""
     view = project(events)
     payloads = {event.hash: event.payload for event in events if event.type == "verify"}
-    return Worklist(view, payloads, pins, full, store_args=store_args, ledger_args=ledger_args)
+    return Worklist(view, payloads, pins, target, store_args=store_args, ledger_args=ledger_args)
 
 
 def worktree_of(path: Path) -> Path | None:
@@ -489,5 +557,6 @@ def worktree_of(path: Path) -> Path | None:
     return None
 
 
-__all__ = ["AREAS", "DRAFT_KEY", "SCHEMA", "Worklist", "area_of", "unpinned_commits",
-           "worklist", "worktree_of"]
+__all__ = ["AREAS", "DRAFT_KEY", "SCHEMA", "Locations", "Worklist", "area_of", "locations",
+           "newest_target", "unpinned_commits", "worklist", "worklist_from_events",
+           "worktree_of"]

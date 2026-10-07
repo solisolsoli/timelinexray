@@ -126,6 +126,10 @@ class Tool:
     data_schema: dict[str, Any]
     handler: Handler
     list_key: str | None = None
+    #: Byte budget of the published ``outputSchema`` (default
+    #: :data:`timelinexray.mcp.schema.OUTPUT_SCHEMA_BUDGET`); a smaller one keeps a tool with
+    #: a large result shape from crowding the ``tools/list`` line.
+    output_budget: int | None = None
 
     def __post_init__(self) -> None:
         S.check_schema(self.input_schema, f"{self.name}.inputSchema")
@@ -144,7 +148,9 @@ class Tool:
     @cached_property
     def output_schema(self) -> dict[str, Any]:
         """The published ``outputSchema``: a lean relaxation of :attr:`strict_output_schema`."""
-        return S.published_output(self.strict_output_schema)
+        if self.output_budget is None:
+            return S.published_output(self.strict_output_schema)
+        return S.published_output(self.strict_output_schema, budget=self.output_budget)
 
     def definition(self, *, strict: bool = False) -> dict[str, Any]:
         """The tool as listed by ``tools/list`` (``strict``: with the strict output schema)."""

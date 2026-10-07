@@ -64,7 +64,9 @@ link at a digest's name is replaced, never followed.
 ## Classes
 
 A class names what the rule saw; it is not a reviewed interpretation. One file can yield
-items of several classes. Rules, in order (classifier version 2; version 1 had no
+items of several classes. Rules, in order (classifier version 3; version 2 had no content
+rules, matched scoring names as substrings and read neighbouring and test symbols, version 1
+had no
 `build-dependency`, no `train` location or test helper names, and its `unknown` items
 carried no reason):
 
@@ -79,8 +81,12 @@ carried no reason):
 | `parameter-default` | the value of a `param!(Name, type, "flag", value)` declaration, a `const`/`static` or Java `static final` with a literal value, a literal Java/Scala field, a Python `UPPER_CASE` constant with a literal value, or a key of a YAML/TOML/INI/JSON config file differs between the two cited declarations; `param!` declarations added or removed | a production value: every value is a **public default** at its commit |
 | `registration` | entries of a list that registers components were added, removed or reordered, or such a list appeared or disappeared: a `vec![...]`, `Seq(...)`, `List.of(...)` or Python list whose entries name components (`...Filter`, `...Source`, `...Hydrator`, `...Scorer`, `...SideEffect`, `...Rule`, ...) or that is bound to a name like `filters`, `sources`, `side_effects`, `rules` | that a registered component is active for any request |
 | `cosmetic` | the comment- and whitespace-insensitive tokens of both sides are equal (string literals kept whole; indentation kept for Python and YAML), or a file moved with identical content | semantic equivalence where parser coverage is incomplete |
-| `scoring-logic` | other changed code whose path, or else enclosing symbol, names scoring, weights or ranking (`scor`, `weight`, `rank`, `boost`, `penalt`, `decay`, `diversit`, `blend`, ...) | that the change alters any ranking outcome |
+| `access-modifier` | a hunk with changed lines on both sides whose tokens are equal once access modifiers are removed (Rust `pub`, `pub(crate)`, `pub(super)`, `pub(in path)`; Java `public`, `private`, `protected`; Scala `private`/`protected` with an optional `[scope]`); decided before the name rules, since no other token changed | that behaviour is unchanged: a newly visible item can be used from other modules |
+| `scoring-logic` | other changed code whose path, or else a symbol enclosing a changed production line, has a whole word naming scoring, weights or ranking (`score`/`scorer`/`scoring`/`scored`, `weight`, `rank`/`ranker`/`ranking`, `rerank`, `rescore`, `boost`, `penalty`, `decay`, `diversity`, `blend`/`blender`, `multiplier`, `calibrate`/`calibration`; words split at punctuation and camelCase), unless the name contains PageRank or RankAll | that the change alters any ranking outcome; in the hand check below about half of the recent items, and fewer over the full history, were scoring code |
 | `model-config` | other changed code or configuration under a model, feature, config, schema, proto, thrift, inference, `train` or training location | that a model artifact was deployed |
+| `observability` | (only when no name rule matched) every changed code line of the hunk belongs to a statement that only logs, traces or records a metric: Rust `trace!`..`error!` and `tracing::`/`log::` macros, `event!`, `metrics`-crate macros, Prometheus `register_*!` statics, `NAME.inc()`/`observe()` and `NAME.with_label_values(..).set()`; Python `logger.`/`logging.`/`log.` calls and `Metrics.counter|histogram|gauge|timer(...)` with an optional `.record()`/`.add()`; Java and Scala `log.`/`logger.` calls and `stats.counter(...).incr()`. Only these call shapes count: the words `metric` or `stats` alone never do, since in this upstream they often name ranking data (`Metric`, `metric_value`, a `stats` map). Statements are split on masked code (no string or comment can fake one), a line shared with any other statement or a block header does not count | that behaviour is unchanged: a logged expression can have side effects and a metric can drive alerts or experiments |
+| `data-type` | (only when no name rule matched) every changed code line lies inside a Rust `struct`, `enum` or `union` definition (Milestone 2 symbols; fields, variants, attributes) and contains no `=` (no discriminant, no attribute default such as `default_value_t = 8080`) | that behaviour is unchanged: a new field or variant changes what code stores, matches and serializes |
+| `visibility-rule` | (only when no name rule matched) every changed code line lies inside a Rust `const`/`static` whose declared type, or a function whose return type, is built only from the visibility rule types `Condition`, `Predicate`, `Clause`, `RuleClause` (`Vec<RuleClause>`, `[Clause; 3]`, `&[Condition]`) | that any post's visibility changed: the definition may be a refactor, and whether a rule runs depends on its registration and safety level |
 | `unknown` | everything else; each item says why (`detail.unknown_reason`): `no-rule` (a parsed language, and no rule matched), `not-parsed` (a language without symbol extraction, such as C, C++, CUDA or shell: only path and token rules could apply), `not-text`, `mode-only` | anything: it needs review |
 
 Every `scoring-logic` and `model-config` item records the rule that decided it in
@@ -94,6 +100,46 @@ rule (`filter`, `visib`, `safety` in a path or symbol, after every other rule) w
 8 hydration inputs to rules and 19 caches, telemetry, server wiring or staging tools, so the name says
 where code lives, not what it does. Those changes stay `unknown`; the digest counts unknown
 items by area, so a filtering subsystem still shows as such.
+
+The `scoring-logic` name rule itself was hand-checked for classifier version 3 (85 items,
+`random.Random(20261007).sample` over items sorted by id, stratified by the deciding rule: 27
+path and all 13 symbol items of `77d431a..78460ca`, 25 path and 20 symbol items of
+`aaa167b..77d431a`; every hunk read at both commits). Correct meant "the changed lines
+compute, combine, weight, threshold or order candidate scores"; adjacent meant score plumbing
+or feed assembly (ads blending, request payloads to the ranker); wrong meant anything else.
+Version 2 precision (correct / adjacent / wrong): recent path 11/7/9, recent symbol 4/0/9,
+full-history path 5/4/16, full-history symbol 3/6/11. Five errors were clear and testable and
+are fixed in version 3: a substring inside another word (`rankall`, `UNSCORED`), the PageRank
+user-reputation score of spam and bot rules, the Phoenix RankAll event-to-index pipeline
+(all 13 sampled RankAll items were Kafka, indexing or configuration code), a pure insertion
+taking the name of the neighbouring declaration at its anchor line, and a test function
+deciding the class of a production line in the same hunk. Every sampled item the fix moved
+out was wrong (21 of 21); none correct or adjacent moved. Version 3 precision on the items
+that stay: recent path 11/7/4, recent symbol 4/0/4, full-history path 5/4/7, full-history
+symbol 3/6/9. What remains wrong is not a clear name error: GPU attention kernels of the
+ranker model (`ranker_fa4/`, `pallas/ranker_attention*`), telemetry and debug code with a
+`scored` name, offline training and evaluation code (`decay`, `weighted`), and wiring inside a
+`ranked_following` pipeline. Read `scoring-logic` as "worth a look", never as "changes
+scoring". Every moved item went to `unknown` or, under a config/proto/thrift location, to
+`model-config`.
+
+The four content rules of version 3 say what the changed lines *do* and were each kept only
+after a seeded hand check (`random.Random(20261007).sample` over the rule's items sorted by
+id, every hunk read at both commits; correct = the stated evidence holds and the title is
+fair): `observability` all 11 items of both ranges, 11 correct, plus a scan of every statement
+the patterns accept in the whole upstream at `78460ca` (2,576 statements; 4 per pattern read
+at seed 20261007, and every receiver name listed: only loggers, log macros and metric
+objects); `access-modifier` all 11
+items, 11 correct; `visibility-rule` 20 of 32 items, 20 correct (many are refactors of the
+rule DSL, which the class allows and its caveat states); `data-type` 26 items (20 recent, 6
+full history) of a first version without the `=` exclusion: 25 correct and one clap
+`Args` struct whose attributes carry command-line defaults, which is why lines with `=` are
+now excluded; of the 22 sampled items that stay `data-type`, 22 are correct. Measured on
+`77d431a..78460ca`: `unknown` 469 -> 404 of 1,236 items (37 hunks to `visibility-rule`, 49 to
+`data-type`, 10 to `access-modifier`, 5 to `observability`; 19 hunks came back from
+`scoring-logic`). On `aaa167b..77d431a`, where most unknown items are whole added files that
+no line rule can take, `unknown` is 1,381 -> 1,422 (49 hunks back from `scoring-logic`, 17
+to `data-type` and `observability`).
 
 Values are compared as their source text with comments removed and whitespace collapsed.
 A constant computed by code (for example `Duration::from_secs(compute())`) is logic, not a
@@ -110,8 +156,8 @@ builds one JSON document (`timelinexray/digest/v1`) and renders it as two Markdo
   and what this file does not list), *What to check next* (the exact commands), then the
   sections below. Parameter defaults, registrations, affected findings and the
   `scoring-logic` items are listed with both citations; every other class
-  (model-config, test-only, build-dependency, cosmetic, docs, license, generated, unknown) is
-  counted by area (the first two directories of a path). Each section has a row budget
+  (visibility-rule, model-config, test-only, build-dependency, data-type, observability,
+  access-modifier, cosmetic, docs, license, generated, unknown) is counted by area (the first two directories of a path). Each section has a row budget
   (`timelinexray.digest.render`: 60 parameter rows, 30 timelines, 30 registration rows, 40
   finding rows, 120 logic items per class, else a by-file table of 40 rows); whatever does not
   fit is named with its count at the top and in its section, and is in the appendix.
@@ -327,6 +373,8 @@ reported, not promised.
 | --- | --- |
 | `77d431a..78460ca` (5 commits, 291 files), classifier v2 | 1,227 net items: parameter-default 25, registration 7, scoring-logic 65, model-config 162, docs-only 1, test-only 248, build-dependency 125, cosmetic 124, generated-vendored 1, unknown 469 (no-rule 459, not-parsed 10; classifier v1: 610 of 1,216). Main digest 39,991 bytes (classifier v1 and the one-file layout: 461,450), appendix 422,982, JSON 2,293,334; `PostUnexploredWeight` public default 0.02 -> 0.015 and `RetrievalCandidatesKafkaMaxCandidates` 200 -> 100000 in `home-mixer/params/param.rs` |
 | `aaa167b..77d431a`, classifier v2 | 2,689 net items, unknown 1,381 (v1: 1,522 of 2,684); main digest 68,360 bytes with every row budget reached and the cut rows named, appendix 1,145,053 |
+| `77d431a..78460ca`, classifier v3 | 1,236 net items: parameter-default 25, registration 7, scoring-logic 53, visibility-rule 32, model-config 163, docs-only 1, test-only 248, build-dependency 125, data-type 37, observability 5, access-modifier 11, cosmetic 124, generated-vendored 1, unknown 404 (no-rule 392, not-parsed 12). Main digest 38,940 bytes, appendix 434,543, JSON 2,306,169 |
+| `aaa167b..77d431a`, classifier v3 | 2,698 net items: scoring-logic 176, data-type 10, observability 6, unknown 1,422; main digest 70,851 bytes (bounded, cuts named), appendix 1,148,942 |
 | `4c5cfe8..a707cc2` (1 step, 89 files) | 381 items: parameter-default 8, registration 1, scoring-logic 16, model-config 43, docs-only 1, test-only 121, cosmetic 1, unknown 190. `ClickWeight` public default 0.4 -> 0.3 in `home-mixer/params/param.rs` (L322 -> L329) and `vm-ranker/params.rs` (L18 -> L18), with `ContClickDwellTimeWeight` 0.0 -> 0.4 and `NotInterestedWeight` -43.2 -> -47.52 in both files; about 2 s |
 | `aaa167b..77d431a` (39 commits, 37 first-parent steps, one merge) | 2,164 files (2,090 added), 2,684 net items: parameter-default 210, registration 54, scoring-logic 243, model-config 466, license 4, docs-only 9, test-only 78, cosmetic 92, generated-vendored 6, unknown 1,522; timelines reproduce, for example, `ClickWeight` 0.4 at 47c1bcd -> 0.3 at a707cc2 and the reversion of `EnableAdsBrandSafetyVerdictV2` (false -> true -> false); about 30 s without an index; byte-identical across runs |
 | `4c5cfe8..a707cc2` with a ledger of 478 active findings (588 cited or dependency spans, no index) | affected findings: 48 findings (83 rows); 286 spans skipped (path untouched at both commits), 268 placed, 34 not placeable; about 1.9 s against 1.7 s without a ledger (7.7 s before the spans were indexed by path, the proposals skipped and the blobs read in one git process per commit); the affected rows are byte-identical to the unfiltered run |

@@ -259,6 +259,8 @@ lines instead of 278). `--json` adds the same summary as `stale_review`.
 into a worklist for a reviewer (`timelinexray/findings/stale.py`). It reads the ledger and
 the pins only: it writes no event, approves nothing and moves no evidence. Freshness is not
 truth.
+The MCP tool `stale_worklist` serves the same worklist read-only, paged and bounded,
+with commands that carry no `--store`/`--ledger` (see [mcp.md](mcp.md)).
 
 - **One entry per finding** that is active, has checkable evidence and is not `CURRENT` at
   the target: freshness, area, evidence class, status (with its basis) and workflow, and
@@ -273,8 +275,15 @@ truth.
   `scoring-logic`; `other`), then the trigger priority of the queue (a changed span before
   an ambiguous or missing one), then the id. The order is a mechanical heuristic for where
   to look first, not a judgement of importance; every entry is listed.
-- **Commands** for each entry, with the `--store`/`--ledger` of the run: `txray show` for
-  the old span and for each candidate (with `--anchor`), then the three decisions:
+- **Commands** for each entry: `txray show` for the old span and for each candidate (with
+  `--anchor`), then the three decisions (below). The text output prints them without
+  `--store`/`--ledger`: when the run's store and ledger are the ones the default resolution
+  finds (`$TXRAY_STORE` or the cache default; `$TXRAY_FINDINGS` or `<store>/findings`),
+  they work as printed; otherwise one `env` line gives the `export TXRAY_STORE=...
+  TXRAY_FINDINGS=...` to run first (only the variables needed). `--json` keeps every
+  command with the options exactly as given, plus `shell.export` (that line, or `null`).
+  The one-line hints of `reanchor`, `verify` and `update --reanchor` leave out a
+  `--store`/`--ledger` that names the default and keep any other. The decisions:
   1. the claim still holds at the target: edit the drafted successor, then
      `txray findings supersede ID --actor AUTHOR --file SPEC`, `txray findings verify
      SUCCESSOR` and a review of the successor by a different reviewer;

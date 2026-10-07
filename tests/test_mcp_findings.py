@@ -798,7 +798,7 @@ class FindingsStdioTest(unittest.TestCase):
         before = ledger_state(FIX.ledger)
         self.client = client = StdioClient(FIX.store_dir, "--ledger", str(FIX.ledger))
         listed = client.ask(request("tools/list", id=1))["result"]["tools"]
-        self.assertEqual([tool["name"] for tool in listed][-3:], FINDINGS_TOOLS)
+        self.assertEqual([tool["name"] for tool in listed][-4:-1], FINDINGS_TOOLS)
         found = self.envelope(client.ask(call("find_findings", {}, id=2)), "find_findings")
         self.assertEqual(ids(found), ["F-reply", "F-filters", "F-web", "F-boost", "F-dep"])
         detail = self.envelope(client.ask(call("get_finding", {"finding_id": "F-click"}, id=3)),

@@ -14,7 +14,7 @@ import re
 
 from ..snapshot.classify import license_kind
 
-CLASSIFIER_VERSION = 2
+CLASSIFIER_VERSION = 3
 
 PARAMETER_DEFAULT = "parameter-default"
 REGISTRATION = "registration"
@@ -24,6 +24,10 @@ LICENSE = "license"
 DOCS_ONLY = "docs-only"
 TEST_ONLY = "test-only"
 BUILD_DEPENDENCY = "build-dependency"
+ACCESS_MODIFIER = "access-modifier"
+DATA_TYPE = "data-type"
+OBSERVABILITY = "observability"
+VISIBILITY_RULE = "visibility-rule"
 COSMETIC = "cosmetic"
 GENERATED_VENDORED = "generated-vendored"
 UNKNOWN = "unknown"
@@ -33,11 +37,15 @@ CLASSES = (
     PARAMETER_DEFAULT,
     REGISTRATION,
     SCORING_LOGIC,
+    VISIBILITY_RULE,
     MODEL_CONFIG,
     LICENSE,
     DOCS_ONLY,
     TEST_ONLY,
     BUILD_DEPENDENCY,
+    DATA_TYPE,
+    OBSERVABILITY,
+    ACCESS_MODIFIER,
     COSMETIC,
     GENERATED_VENDORED,
     UNKNOWN,
@@ -47,11 +55,15 @@ CLASS_TITLES = {
     PARAMETER_DEFAULT: "Parameter default change",
     REGISTRATION: "Filter/pipeline registration change",
     SCORING_LOGIC: "Weight/scoring logic change",
+    VISIBILITY_RULE: "Visibility rule definition change",
     MODEL_CONFIG: "Model/config change",
     LICENSE: "License/notice change",
     DOCS_ONLY: "Documentation-only change",
     TEST_ONLY: "Test-only change",
     BUILD_DEPENDENCY: "Build/dependency/import change",
+    DATA_TYPE: "Type definition change",
+    OBSERVABILITY: "Logging/metrics-only change",
+    ACCESS_MODIFIER: "Access-modifier-only change",
     COSMETIC: "Formatting-only/cosmetic change",
     GENERATED_VENDORED: "Generated or vendored file",
     UNKNOWN: "Unknown / unresolved change",
@@ -63,8 +75,14 @@ CLASS_EVIDENCE = {
     "field or a config key differs between the two cited declarations",
     REGISTRATION: "entries of a list that registers components (filters, sources, hydrators, "
     "scorers, side effects, rules, ...) were added, removed or reordered",
-    SCORING_LOGIC: "changed code whose path or enclosing symbol names scoring, weights or "
-    "ranking (a name heuristic, not a semantic analysis)",
+    SCORING_LOGIC: "changed code whose path, or else the production symbol enclosing a "
+    "changed line, has a word naming scoring, weights or ranking (score, weight, rank, boost, "
+    "decay, blend, ...; not PageRank or RankAll): a name heuristic, not a semantic analysis; "
+    "in a hand check 15 of 30 recent and 8 of 34 full-history items were scoring code "
+    "(docs/updates.md)",
+    VISIBILITY_RULE: "every changed code line lies inside a Rust const or function whose declared "
+    "or return type is built only from the visibility rule types Condition, Predicate, Clause "
+    "and RuleClause (a declared-type rule, Milestone 2 symbols), and no name rule matched",
     MODEL_CONFIG: "changed code or configuration in a model, feature, config, schema, proto, "
     "thrift, inference, train or training location (a path heuristic)",
     LICENSE: "a license or notice file, or license header lines, changed",
@@ -75,6 +93,15 @@ CLASS_EVIDENCE = {
     "*.bazel, Cargo.toml, build.rs, requirements*.txt, Makefile, ...), or every changed code "
     "line is an import, use, extern crate, bodyless mod or package declaration (Milestone 2 "
     "symbols)",
+    DATA_TYPE: "every changed code line lies inside a Rust struct, enum or union definition "
+    "(fields, variants, their attributes; Milestone 2 symbols) and assigns no value (no '=': "
+    "no discriminant, no attribute default), and no name rule matched",
+    OBSERVABILITY: "every changed code line belongs to a statement that only logs, traces or "
+    "records a metric (Rust log/tracing/metrics macros and Prometheus counters, Python logger "
+    "and metrics calls, Java/Scala log and stats calls; masked code), and no name rule matched",
+    ACCESS_MODIFIER: "the comment- and whitespace-insensitive tokens of both sides are equal once "
+    "access modifiers are removed (Rust pub, pub(crate), pub(super), pub(in path); Java public, "
+    "private, protected; Scala private/protected[scope])",
     COSMETIC: "only comments, whitespace or line endings changed (token sequences are "
     "equal), or a file moved without content change",
     GENERATED_VENDORED: "the manifest classifies the file as generated or vendored",
@@ -86,11 +113,19 @@ CLASS_CAVEATS = {
     PARAMETER_DEFAULT: "a production value: every value is a public default at its commit",
     REGISTRATION: "that a registered component is active for any request",
     SCORING_LOGIC: "that the change alters any ranking outcome",
+    VISIBILITY_RULE: "that any post's visibility changed: the definition may be refactored, and "
+    "whether a rule runs depends on its registration and safety level",
     MODEL_CONFIG: "that a model artifact was deployed",
     LICENSE: "a determination of the applicable license",
     DOCS_ONLY: "a change of behaviour",
     TEST_ONLY: "a change of production code",
     BUILD_DEPENDENCY: "that behaviour is unchanged",
+    DATA_TYPE: "that behaviour is unchanged: a new field or variant changes what code can "
+    "store, match and serialize",
+    OBSERVABILITY: "that behaviour is unchanged: a logged or counted expression can have "
+    "side effects, and a metric can drive alerts or experiments",
+    ACCESS_MODIFIER: "that behaviour is unchanged: a newly visible item can be used, and a "
+    "hidden one no longer can, from other modules",
     COSMETIC: "semantic equivalence where parser coverage is incomplete",
     GENERATED_VENDORED: "reviewed upstream code",
     UNKNOWN: "anything: it needs review",
@@ -119,7 +154,21 @@ _TEST_NAMES = re.compile(
     r"[^/]*_fixtures?\.(rs|py|scala|java))$"
 )
 
-_SCORING = re.compile(r"(?i)(scor|weight|rank|boost|penalt|decay|diversit|blend|multiplier|calibrat)")
+#: Words (lower case, after splitting a name at non-alphanumerics and camelCase humps) that
+#: name scoring, weights or ranking. Whole words only: ``rankall`` or ``unscored`` are not.
+_SCORING_WORD = re.compile(
+    r"(?:re)?(?:scor(?:e|es|ed|er|ers|ing)|rank(?:s|ed|er|ers|ing|ings)?)"
+    r"|weight(?:s|ed|ing)?|boost(?:s|ed|ing)?|penalt(?:y|ies)|decay(?:s|ed|ing)?"
+    r"|diversit(?:y|ies)|blend(?:s|ed|er|ers|ing)?|multipliers?"
+    r"|calibrat(?:e|es|ed|ing|ion|ions|or|ors)"
+)
+#: Word sequences that name a system, not scoring: PageRank (a user reputation graph score
+#: used by spam and bot rules) and Phoenix RankAll (an event-to-index pipeline). A name that
+#: contains one of them is not a scoring name, whatever else it contains (hand check,
+#: classifier version 3, docs/updates.md).
+_NOT_SCORING_PHRASES = (("page", "rank"), ("pagerank",), ("rank", "all"), ("rankall",))
+_NAME_CHUNK = re.compile(r"[A-Za-z0-9]+")
+_NAME_WORD = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+")
 _MODEL_CONFIG_DIRS = re.compile(
     r"(?i)^(models?|features?|configs?|conf|settings|schemas?|protos?|thrift|embeddings?|"
     r"checkpoints?|inference|train|training)$"
@@ -190,8 +239,26 @@ def is_build_path(path: str) -> bool:
     return posixpath.splitext(lowered)[1] in _BUILD_EXTENSIONS
 
 
+def name_words(text: str) -> list[str]:
+    """The lower-case words of a path or symbol name: split at every non-alphanumeric
+    character and at camelCase humps (``PhoenixRankAll`` -> phoenix, rank, all)."""
+    words: list[str] = []
+    for chunk in _NAME_CHUNK.findall(text):
+        words.extend(word.lower() for word in _NAME_WORD.findall(chunk))
+    return words
+
+
 def is_scoring_name(text: str | None) -> bool:
-    return bool(text) and bool(_SCORING.search(text))
+    """Whether a path or symbol name names scoring, weights or ranking: one of its words is a
+    scoring word and it names none of the excluded systems (PageRank, Phoenix RankAll)."""
+    if not text:
+        return False
+    words = name_words(text)
+    for phrase in _NOT_SCORING_PHRASES:
+        size = len(phrase)
+        if any(tuple(words[i:i + size]) == phrase for i in range(len(words) - size + 1)):
+            return False
+    return any(_SCORING_WORD.fullmatch(word) for word in words)
 
 
 def is_model_config_path(path: str) -> bool:
@@ -237,7 +304,8 @@ def logic_match(paths: tuple[str, ...],
     with the rule that decided it: ``(class, "path" | "symbol" | None, matched name)``.
 
     Order: a scoring-related path, a model/config path, a scoring-related enclosing symbol
-    name, else unknown. (A filtering/visibility name rule was tried for classifier version 2
+    name, else unknown (:func:`is_scoring_name`; the caller passes only symbols that enclose a
+    changed production line). (A filtering/visibility name rule was tried for classifier version 2
     and rejected: in a hand check most of its items were caches, telemetry and tooling, so
     such changes stay ``unknown``; see ``docs/updates.md``.)
     """

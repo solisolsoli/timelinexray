@@ -21,6 +21,7 @@ from functools import cached_property
 
 from ..span import LineMap, SpanRead, read_span
 from ..syntax.source import Lines, Masked, mask, match_delimiters
+from . import content
 from .hunks import split_lines
 from .model import Citation, SPAN
 from .rules import NATIVE_LANGUAGES, is_key_value_config
@@ -383,11 +384,49 @@ class BlobAnalysis:
         """Whether every code line of ``lines`` is an import or bodyless module declaration.
 
         ``None`` when there is no code line at all (nothing to decide on this side)."""
-        declared = self.declaration_lines
+        return self.only_within(lines, self.declaration_lines)
+
+    def only_within(self, lines: list[int], allowed: frozenset[int]) -> bool | None:
+        """Whether every code line of ``lines`` is in ``allowed`` (``None``: no code line)."""
         code_lines = [line for line in lines if not self.code_free(line)]
         if not code_lines:
             return None
-        return all(line in declared for line in code_lines)
+        return all(line in allowed for line in code_lines)
+
+    # -- content rules (timelinexray.diff.content) ---------------------------------------
+
+    @cached_property
+    def telemetry_lines(self) -> frozenset[int]:
+        """Lines whose every statement logs, traces or records a metric (native languages)."""
+        if self.masked is None or self.char_lines is None:
+            return frozenset()
+        return content.telemetry_lines(self.masked.code, self.language or "", self.char_lines.starts)
+
+    @cached_property
+    def type_body_lines(self) -> frozenset[int]:
+        """Lines inside a Rust ``struct``, ``enum`` or ``union`` definition (Milestone 2
+        symbols, attributes included) that assign no value: a line with ``=`` in its code
+        (an enum discriminant, an attribute argument such as ``default_value_t = 8080``) is
+        excluded. Empty for other languages."""
+        if self.masked is None or self.language != "rust":
+            return frozenset()
+        lines: set[int] = set()
+        for symbol in self.symbols.symbols:
+            if symbol.kind in content.TYPE_KINDS:
+                lines.update(range(symbol.start_line, min(symbol.end_line, self.line_count) + 1))
+        code = self.masked.code
+        return frozenset(line for line in lines if "=" not in code[slice(*self.char_range(line, line))])
+
+    @cached_property
+    def rule_declaration_lines(self) -> frozenset[int]:
+        """Lines inside a Rust visibility rule declaration (:func:`content.is_rule_declaration`)."""
+        if self.masked is None or self.language != "rust":
+            return frozenset()
+        lines: set[int] = set()
+        for symbol in self.symbols.symbols:
+            if content.is_rule_declaration(symbol.kind, symbol.signature or ""):
+                lines.update(range(symbol.start_line, min(symbol.end_line, self.line_count) + 1))
+        return frozenset(lines)
 
     # -- declarations with values --------------------------------------------------------
 

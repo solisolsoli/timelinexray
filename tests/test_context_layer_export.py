@@ -679,7 +679,7 @@ class IndependenceTest(unittest.TestCase):
         self.assertEqual(proc.stdout.strip(), b"[]")
         tools = json.loads((REPO_ROOT / "tests" / "mcp_tools_list.json").read_text("utf-8"))
         names = [tool["name"] for tool in tools["tools"]]
-        self.assertEqual(len(names), 12)
+        self.assertEqual(len(names), 13)
         self.assertFalse(any("export" in name or "context" in name for name in names))
 
 

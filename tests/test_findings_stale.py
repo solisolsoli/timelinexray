@@ -204,7 +204,53 @@ class WorklistTest(unittest.TestCase):
         self.assertNotIn(b"[2]", text)
         self.assertIn(b"shown 1 of 4; --limit 0 lists all", text)
         self.assertIn(b"(a mechanical order, not a judgement)", text)
-        self.assertIn(f"--store {self.store.root}".encode(), text)
+        # text: short commands and one export line; --json: the options as given
+        self.assertNotIn(b"--store", text.replace(b"omit --store/--ledger", b""))
+        self.assertIn(f"env           export TXRAY_STORE={self.store.root} "
+                      f"TXRAY_FINDINGS={self.memory.ledger.directory}".encode(), text)
+        self.assertIn(f"--store {self.store.root}".encode(), first[1])
+        self.assertEqual(data["shell"]["export"],
+                         f"export TXRAY_STORE={self.store.root} "
+                         f"TXRAY_FINDINGS={self.memory.ledger.directory}")
+
+    def test_short_commands_when_the_paths_are_the_defaults(self) -> None:
+        store, ledger = str(self.store.root), str(self.memory.ledger.directory)
+        env = {"TXRAY_STORE": store, "TXRAY_FINDINGS": ledger}
+        for argv in (["findings", "stale"], ["findings", "stale", "--store", store, "--ledger",
+                                             ledger]):
+            with self.subTest(argv=argv):
+                code, text, _ = run_cli(argv, env=env)
+                self.assertEqual(code, 0)
+                self.assertNotIn(b"--store", text)
+                self.assertNotIn(b"--ledger", text)
+                self.assertNotIn(b"export ", text)
+                self.assertIn(b"    as is      txray findings review D-param --actor", text)
+        # the ledger default <store>/findings needs neither option nor variable
+        code, out, _ = run_cli(["findings", "stale", "--json", "--store", store, "--ledger",
+                                ledger], env=env)
+        data = json.loads(out)["data"]
+        self.assertIsNone(data["shell"]["export"])
+        self.assertIn(f"--store {store}", data["batch"][0]["command"]
+                      if data["batch"] else data["entries"][0]["commands"]["decide"]["retract"])
+        # only the store set through the environment: --ledger stays, as an export
+        code, text, _ = run_cli(["findings", "stale", "--ledger", ledger],
+                                env={"TXRAY_STORE": store, "TXRAY_FINDINGS": ""})
+        self.assertEqual(code, 0)
+        self.assertIn(f"env           export TXRAY_FINDINGS={ledger}   (run this".encode(), text)
+        self.assertNotIn(b"TXRAY_STORE=", text)
+
+    def test_one_line_hints_leave_out_default_locations(self) -> None:
+        store, ledger = str(self.store.root), str(self.memory.ledger.directory)
+        code, out, _ = run_cli(["findings", "reanchor", FIX.new[:12], "--summary", "--store",
+                                store, "--ledger", ledger],
+                               env={"TXRAY_STORE": store, "TXRAY_FINDINGS": ledger})
+        self.assertEqual(code, 0)
+        self.assertIn(b"next       txray findings stale --target " + FIX.new[:12].encode()
+                      + b"   (", out)
+        self.assertNotIn(b"--store", out)
+        code, out, _ = run_cli(["findings", "reanchor", FIX.new[:12], "--summary", "--store",
+                                store, "--ledger", ledger], env={"TXRAY_FINDINGS": ""})
+        self.assertIn(f"--store {store} --ledger {ledger}".encode(), out)
 
     def test_reanchor_summary_replaces_the_per_finding_lines(self) -> None:
         args = ["--store", str(self.store.root), "--ledger", str(self.memory.ledger.directory)]
@@ -355,6 +401,36 @@ class PinCitedTest(unittest.TestCase):
         code, _, err = run_cli(["findings", "verify", "--upstream", FIX.url, *args])
         self.assertEqual(code, 2)
         self.assertIn(b"--upstream is used only with --pin-cited", err)
+
+
+class LocationsTest(unittest.TestCase):
+    """Which --store/--ledger options a printed command needs, and the export line."""
+
+    def test_defaults_need_nothing(self) -> None:
+        from timelinexray.findings.stale import locations
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "cache"
+            env = {"XDG_CACHE_HOME": str(cache)}
+            default = cache / "timelinexray"
+            where = locations(str(default), str(default / "findings"), env)
+            self.assertEqual((where.store_args, where.ledger_args, where.export_line),
+                             ([], [], None))
+            other = Path(tmp) / "other store"
+            where = locations(str(other), None, env)
+            self.assertEqual(where.store_args, ["--store", str(other)])
+            self.assertEqual(where.ledger_args, [])  # <other>/findings is its default
+            self.assertEqual(where.export_line, f"export TXRAY_STORE='{other}'")
+            where = locations(None, str(other / "findings"), env)
+            self.assertEqual(where.export_line, f"export TXRAY_FINDINGS='{other / 'findings'}'")
+
+    def test_a_default_ledger_inside_a_working_tree_is_never_assumed(self) -> None:
+        from timelinexray.findings.stale import locations
+        with tempfile.TemporaryDirectory() as tmp:
+            tree = Path(tmp) / "tree"
+            (tree / ".git").mkdir(parents=True)
+            where = locations(str(tree / "store"), str(Path(tmp) / "ledger"), {})
+            self.assertEqual(where.ledger_args, ["--ledger", str(Path(tmp) / "ledger")])
+            self.assertIn("TXRAY_FINDINGS=", where.export_line or "")
 
 
 if __name__ == "__main__":

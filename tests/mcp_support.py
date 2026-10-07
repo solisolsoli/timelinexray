@@ -46,12 +46,16 @@ EXPECTED_TOOLS = [
     "find_findings",
     "get_finding",
     "verify_claim",
+    "stale_worklist",
 ]
 #: The Milestone 4b tools, which read the configured findings ledger.
 FINDINGS_TOOLS = ["find_findings", "get_finding", "verify_claim"]
+#: Every tool that reads the configured findings ledger (the findings tools and the
+#: stale-review worklist).
+LEDGER_TOOLS = [*FINDINGS_TOOLS, "stale_worklist"]
 #: The parameter tools (P7 get_param / param_history) over the index and the pins.
 PARAM_TOOLS = ["get_param", "param_history"]
-CODE_TOOLS = [name for name in EXPECTED_TOOLS if name not in FINDINGS_TOOLS]
+CODE_TOOLS = [name for name in EXPECTED_TOOLS if name not in LEDGER_TOOLS]
 
 
 def request(method: str, params: Mapping[str, Any] | None = None, *, id: Any = 1,

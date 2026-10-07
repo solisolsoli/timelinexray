@@ -5,7 +5,7 @@ This file is the contract for every human or AI agent working in this repository
 with `cmp AGENTS.md CLAUDE.md`.
 
 TimelineXray is an evidence-first research tool for the public `xai-org/x-algorithm`
-repository. Status: version 0.10.0, public alpha on GitHub (not yet tagged); all six milestones are
+repository. Status: version 0.11.0, public alpha on GitHub (tag v0.11.0; the semantic gate passed one live run); all six milestones are
 implemented (see `docs/architecture.md`); known limits are in `docs/limits.md`. An optional
 Context Layer export exists (`docs/context-layer.md`): never import `context_layer` or add it
 as a dependency, and keep every such integration off unless a user runs it.
@@ -55,6 +55,11 @@ as a dependency, and keep every such integration off unless a user runs it.
   labels, suppression or causality from missing metrics. Missing negative feedback is
   unknown, never zero. There is no "algorithm score" and no reach prediction.
 - On insufficient evidence, abstain and report the exact search scope and limitation.
+  Answer-or-abstain rules R1-R4 (`docs/agents/README.md`): a request-time value (model
+  output, rank, reach, experiment assignment, live or production state) is not in the code;
+  a suppression or boost claim needs a span implementing exactly that rule; stop searching
+  after two searches in a row, or eight in all, that find no span stating the fact; an
+  abstention states its scope.
 
 ## Hard boundaries
 

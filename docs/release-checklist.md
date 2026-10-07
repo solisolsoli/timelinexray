@@ -1,4 +1,4 @@
-# Release checklist: 0.9.0
+# Release checklist: 0.11.0 (sections 1 and 3a; earlier walks kept as recorded)
 
 Version 0.6.0 completed Milestone 6 (release hardening) and with it all six milestones;
 0.7.0 added the optional Context Layer export; 0.9.0 adds the fixes of an end-to-end
@@ -7,7 +7,9 @@ approved publishing the repository on 2026-10-02 although the semantic gate has 
 passed; the repository is public and the README states the measured gate results.
 **The first live run of the semantic gate failed; the `v0.9.0` tag and a GitHub release
 wait for a passing run.** Version 0.10.0 (one-command install: `install.sh`, `txray setup`)
-changed no gate-relevant code; its `v0.10.0` tag waits for the same passing run.
+changed no gate-relevant code; its `v0.10.0` tag waited for the same passing run. **Version 0.11.0
+passed the semantic gate at its fourth live run (2026-10-07, set revision 2, agent contract r2;
+one run, section 3a) and is the first tagged release, `v0.11.0`.** 0.9.0 and 0.10.0 stay untagged.
 
 Sections 1 and 3a were run for 0.9.0. Section 2 is the full clean-install walk of 0.6.0,
 kept as the last full walk; for 0.9.0 the build and clean-venv install inside `make ci`
@@ -255,6 +257,92 @@ Root reading: the items are sound (no set change is proposed); the misses are ag
 that varies between runs at the same settings. Nothing was re-scored. A pass needs a new run;
 whether to strengthen the agent contract's abstention rule before it is a design decision that
 would be evaluated on this same set, so it is recorded here rather than made now.
+
+### Abstention development set and contract revision 2 (prepared and run 2026-10-07)
+
+The two abstention misses of the third run (A02, A06) are agent behaviour, so the agent
+contract was changed, but not by tuning against this gate set: the general rules R1-R4
+(`docs/agents/README.md`, "Answer or abstain") were written for the three families of
+questions involved and are measured first on a separate development set,
+`eval/dev-abstain.json` (14 new abstain items, 12 answerable controls; see
+`eval/README.md`). The gate sets, thresholds and every recorded result are unchanged
+(`tests/test_agent_contract.py` pins the SHA-256 of both gate files). The rules are stated in
+the MCP server instructions, the `search_code` description, `docs/agents/AGENTS-snippet.md`,
+`AGENTS.md` and the live harness (contract `r2`, now the default; `r1` is kept verbatim).
+Deterministic checks: development set PASS 78 / 78, gate revision 2 PASS 237 / 237.
+
+Commands (run by root on 2026-10-07 with the owner's approval; results below) (one store for all
+three runs; same model and client version; run (a) before deciding on (b)):
+
+```sh
+REPO=/path/to/timelinexray; UP=/path/to/x-algorithm-upstream
+WORK=$(mktemp -d); STORE=$WORK/store
+export TXRAY_ALLOW_FILE_URLS=file://$UP
+for c in 4c5cfe8f07f1c76d4f04277e803f20e6039f5191 a707cc27ba36d3fa79450c9cffcc48a82d080b02 77d431aabf409ca1c1eed9bec7e2183f7c914e23; do
+  PYTHONPATH=$REPO/src python3 -m timelinexray pin $c --upstream file://$UP --store "$STORE"; done
+PYTHONPATH=$REPO/src python3 -m timelinexray index 77d431aabf409ca1c1eed9bec7e2183f7c914e23 --store "$STORE"
+cd "$REPO"
+python3 eval/run_gate.py --store "$STORE" --questions eval/dev-abstain.json    # expect PASS 78 / 78
+python3 eval/run_gate.py --store "$STORE" --questions eval/questions-v2.json   # expect PASS 237 / 237
+# (a) development set, before: contract r1 and the server of 0c4df26
+mkdir -p "$WORK/base" && git -C "$REPO" archive 0c4df26 src | tar -x -C "$WORK/base"
+python3 eval/live_gate.py --store "$STORE" --out "$WORK/dev-before" --questions eval/dev-abstain.json \
+    --contract r1 --server-src "$WORK/base/src" --model haiku --budget-usd 2.00
+# (a) development set, after: contract r2 and this checkout's server
+python3 eval/live_gate.py --store "$STORE" --out "$WORK/dev-after" --questions eval/dev-abstain.json \
+    --model haiku --budget-usd 2.00
+# (b) next gate run: set revision 2, unchanged
+python3 eval/live_gate.py --store "$STORE" --out "$WORK/gate" --questions eval/questions-v2.json \
+    --model haiku --budget-usd 3.00
+```
+
+Expected cost (estimates from the three gate runs: USD 0.005-0.21 per abstain item, 0.015-0.09
+per answer item, USD 0.20 cap per item): (a) before about USD 0.8-1.3, after about USD
+0.5-1.0, together about USD 1.3-2.3 with a hard cap of USD 4.00; (b) about USD 1.4-1.8 (runs
+at USD 1.80, 1.40, 1.39) with a hard cap of USD 3.00. Read (a) as a signal, not a pass: 26
+items, one run each, model behaviour varies between runs. What would count against
+contract r2: a lower control score than r1 (false abstentions) or abstentions that still end
+at the turn limit. A gate pass in (b) is not guaranteed.
+
+Results (Claude Code 2.1.292, `claude-haiku-4-5-20251001`, one store, one invocation per run,
+every item run exactly once; reports `eval/dev-run-2026-10-07-contract-r1.txt`,
+`eval/dev-run-2026-10-07-contract-r2.txt`):
+
+| Development set (26 items) | contract r1, server of 0c4df26 | contract r2 |
+| --- | --- | --- |
+| Answer controls correct | 12 / 12 | 12 / 12 |
+| Abstentions correct | 14 / 14 | 14 / 14 |
+| False abstentions | 0 / 12 | 0 / 12 |
+| Turns on abstain items (max per item) | 233 (48) | 81 (15) |
+| Cost | USD 1.37 | USD 0.68 |
+
+The development set did not separate the two contracts on accuracy: r1 already abstained
+correctly on every new item. It shows what r2 changes: abstentions end after a bounded search
+(at most 15 turns instead of 48, a third of the turns, half the cost), and no control item
+was lost to a false abstention. On that signal (b) was run.
+
+### Fourth live run (2026-10-07, set revision 2, contract r2): passed
+
+Same client, model, settings and store as above; set revision 2 unchanged; one invocation,
+every item ran exactly once. Total cost USD 1.10 (budget USD 3.00); 271 turns. Full per-item
+report: [`eval/live-run-2026-10-07-contract-r2.txt`](../eval/live-run-2026-10-07-contract-r2.txt).
+
+| Metric | Measured | Threshold | Result |
+| --- | --- | --- | --- |
+| Semantic citation precision | 30 / 30 = 1.000 | >= 0.95 | pass |
+| Coverage (recall) | 30 / 31 = 0.968 | >= 0.80 | pass |
+| Abstention accuracy | 9 / 9 = 1.000 | 1.00 | pass |
+| False-abstention rate | 1 / 31 = 0.032 | <= 0.20 | pass |
+| Citation integrity of the agent's citations | 48 / 48 = 1.000 | 1.00 | pass |
+| Completeness | 40 / 40 run, 0 errors | every item, no errors | pass |
+
+**The gate passed at this run.** A02 abstained in 2 turns and A06 in 15. The one miss is Q22,
+a false abstention (12 turns): the answer exists at lines 200 and 227 of
+`UthDailyPostsJob.scala`. Limits of this result: it is one run of one model; earlier runs with
+the same set varied (abstention 9/9 in the second run, 7/9 in the third), so a single pass shows
+the gate can be met, not that every run meets it. The contract change was designed after the
+third run's misses, from a separate development set, without tuning on the gate items.
+
 
 ### Gate rule (root-reviewed 2026-10-01)
 

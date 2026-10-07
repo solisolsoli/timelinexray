@@ -1,7 +1,7 @@
 # Known limits
 
 Everything TimelineXray knows it does not do, does not know or has not tested, in one place
-(0.10.0). Each item links to the document with the details. A limit here is a statement of
+(0.11.0). Each item links to the document with the details. A limit here is a statement of
 scope, not a bug report; where a limit is enforced, the test that enforces it is named.
 
 ## What the evidence can and cannot say
@@ -93,7 +93,7 @@ scope, not a bug report; where a limit is enforced, the test that enforces it is
   40-question semantic gate set in `eval/questions.json` (31 answer, 9 abstention items;
   root-reviewed 2026-10-01; neither live run, 2026-10-01 and 2026-10-02, passed), with its
   revision 2 `eval/questions-v2.json` (root-reviewed 2026-10-07: corrected answer patterns and
-  one added expected citation; live run 2026-10-07: precision 0.969, abstention 7/9, not passed). Its deterministic harness runs in `make ci`
+  one added expected citation; live run 2026-10-07 with contract r1: abstention 7/9, not passed; with contract r2: passed, one run). Its deterministic harness runs in `make ci`
   on both revisions; its live
   harness runs one agent once per release by hand, so the semantic precision, coverage and
   abstention numbers hold for that date, model and client only, with the sample sizes
@@ -107,9 +107,13 @@ scope, not a bug report; where a limit is enforced, the test that enforces it is
   configuration service at runtime is invisible; the `home-mixer` and `vm-ranker` copies of
   a weight are not asserted to correspond; registration detection sees list literals only.
   Name and path classes (`scoring-logic`, `model-config`) say where code lives, not what it
-  does; no filtering/visibility class exists because a name rule for it was mostly wrong in a
-  hand check ([updates.md](updates.md)), so filtering code is `unknown` unless another rule
-  applies. About 38 % of the items of `77d431a..78460ca` stay `unknown` (classifier v2).
+  does: in a hand check about half of the recent `scoring-logic` items and a quarter over the
+  full history were scoring code ([updates.md](updates.md)). A filtering/visibility *name*
+  rule was mostly wrong and does not exist; `visibility-rule` is a declared-type content rule
+  for the rule DSL only, so other filtering code (hydration, staging, treatment) is `unknown`
+  unless another rule applies. Content rules (`observability`, `data-type`,
+  `visibility-rule`, `access-modifier`) cover a whole hunk or nothing. About 33 % of the items
+  of `77d431a..78460ca` stay `unknown` (classifier v3); whole added files almost always do.
 - The main Markdown digest is bounded by row budgets; on a large range it names what it cut
   and the appendix holds the rest. The appendix and the JSON document are not bounded
   (the appendix of `aaa167b..77d431a` is about 1.1 MB).

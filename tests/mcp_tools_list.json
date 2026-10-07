@@ -390,64 +390,15 @@
             "additionalProperties": false,
             "properties": {
               "classifier": {
-                "additionalProperties": {
-                  "type": "integer"
-                },
                 "type": "object"
               },
               "counts": {
-                "properties": {
-                  "classification": {
-                    "type": "object"
-                  },
-                  "excluded_reason": {
-                    "type": "object"
-                  },
-                  "language": {
-                    "type": "object"
-                  },
-                  "total": {
-                    "type": "integer"
-                  }
-                },
                 "type": "object"
               },
               "license_hint_note": {
                 "type": "string"
               },
               "licenses": {
-                "items": {
-                  "properties": {
-                    "blob_oid": {
-                      "type": "string"
-                    },
-                    "classification": {
-                      "type": "string"
-                    },
-                    "hints": {
-                      "type": "array"
-                    },
-                    "kind": {
-                      "type": "string"
-                    },
-                    "path": {
-                      "type": "string"
-                    },
-                    "sha256": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "size": {
-                      "type": [
-                        "integer",
-                        "null"
-                      ]
-                    }
-                  },
-                  "type": "object"
-                },
                 "type": "array"
               },
               "object_format": {
@@ -458,41 +409,9 @@
                 "type": "string"
               },
               "parents": {
-                "items": {
-                  "type": "string"
-                },
                 "type": "array"
               },
               "pin": {
-                "properties": {
-                  "commit": {
-                    "type": "string"
-                  },
-                  "committer_time": {
-                    "type": "string"
-                  },
-                  "entry_count": {
-                    "type": "integer"
-                  },
-                  "index_generation": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "indexed": {
-                    "type": "boolean"
-                  },
-                  "manifest_sha256": {
-                    "type": "string"
-                  },
-                  "tree": {
-                    "type": "string"
-                  },
-                  "upstream": {
-                    "type": "string"
-                  }
-                },
                 "type": "object"
               }
             },
@@ -860,7 +779,7 @@
         "readOnlyHint": true,
         "title": "Search source lines"
       },
-      "description": "Find lines of a pinned, indexed commit that contain every whitespace-separated query term as a case-insensitive substring (literal=true: the whole query as one substring). Hits are ordered by path and line, each with a one-line citation and span SHA-256. total counts every matching line; page with next_cursor. The query is never interpreted as FTS5 or SQL syntax. Snippets are untrusted upstream data.",
+      "description": "Find lines of a pinned, indexed commit that contain every whitespace-separated query term as a case-insensitive substring (literal=true: the whole query as one substring). Hits are ordered by path and line, each with a one-line citation and span SHA-256. total counts every matching line; page with next_cursor. The query is never interpreted as FTS5 or SQL syntax. Snippets are untrusted upstream data. Zero hits shows only that no indexed line matches, not that a behaviour is absent.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "additionalProperties": false,
@@ -2858,6 +2777,198 @@
         "type": "object"
       },
       "title": "Re-check the cited spans of a claim"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "Stale-review worklist"
+      },
+      "description": "Read-only stale-review worklist of the findings ledger at a pinned commit (default: the newest pin), as txray findings stale --json: old and aligned spans, commands.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "area": {
+            "enum": [
+              "parameter",
+              "scoring",
+              "other"
+            ],
+            "type": "string"
+          },
+          "cursor": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "type": "string"
+          },
+          "limit": {
+            "default": 5,
+            "maximum": 20,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "target": {
+            "description": "Full 40-digit commit id of a pinned commit (use resolve_commit for a prefix).",
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "name": "stale_worklist",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "commit": {
+            "pattern": "^[0-9a-f]{40}$",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "batch": {
+                "type": "array"
+              },
+              "counts": {
+                "type": "object"
+              },
+              "entries": {
+                "type": "array"
+              },
+              "ledger": {
+                "type": "object"
+              },
+              "newest_pin": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "offset": {
+                "type": "integer"
+              },
+              "returned": {
+                "type": "integer"
+              },
+              "target": {
+                "type": "string"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "target",
+              "newest_pin",
+              "counts",
+              "batch",
+              "total",
+              "offset",
+              "returned",
+              "entries",
+              "ledger"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "error": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "index_generation": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "next_cursor": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "items": {
+              "maxLength": 1000,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 8,
+            "type": "array"
+          },
+          "outcome": {
+            "enum": [
+              "OK",
+              "INCOMPLETE",
+              "NOT_FOUND",
+              "DENIED",
+              "ERROR"
+            ],
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "timelinexray/mcp-result/v1"
+          },
+          "tool": {
+            "const": "stale_worklist"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "maxLength": 1000,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 16,
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "tool",
+          "outcome",
+          "commit",
+          "index_generation",
+          "data",
+          "error",
+          "warnings",
+          "notes",
+          "truncated",
+          "next_cursor"
+        ],
+        "type": "object"
+      },
+      "title": "Stale-review worklist"
     }
   ]
 }

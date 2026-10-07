@@ -286,7 +286,7 @@ def counts(max_items: int = 64) -> dict[str, Any]:
 _SHAPE = frozenset({"type", "enum", "const", "properties", "items", "additionalProperties",
                     "anyOf", "$ref"})
 #: Byte budget of one published output schema (compact JSON), see :func:`published_output`.
-OUTPUT_SCHEMA_BUDGET = 2200
+OUTPUT_SCHEMA_BUDGET = 2100
 _FACTOR_MIN_BYTES = 60
 
 

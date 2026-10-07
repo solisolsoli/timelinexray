@@ -1,0 +1,39 @@
+live semantic gate: 26 / 26 items run (12 answer, 14 abstain in the set; 0 not run, 0 errors); revision 1; status: development set, written 2026-10-07 before any live run; not the release gate; contract r2
+models: claude-haiku-4-5-20251001; cost USD 0.6762; turns 161; tokens {'input_tokens': 934, 'cache_creation_input_tokens': 177746, 'cache_read_input_tokens': 1152801, 'output_tokens': 40902}
+  precision              12 / 12 = 1.000
+  coverage               12 / 12 = 1.000
+  coverage_of_set        12 / 12 = 1.000
+  abstention_accuracy    14 / 14 = 1.000
+  false_abstention_rate  0 / 12 = 0.000
+  citation_integrity     14 / 14 = 1.000
+  abstentions_with_scope 8 / 14 = 0.571
+  categories: correct 12, correct_abstention 14
+  families: control-live-config 4/4, control-moderation 5/5, control-per-request 3/3, live-config 5/5, moderation 4/4, per-request 5/5
+  turns: answer 80 (max 15), abstain 81 (max 15)
+  DA01 run     correct_abstention  USD 0.0184 turns 2   spans 0/0
+  DA02 run     correct_abstention  USD 0.0159 turns 4   spans 0/0
+  DA03 run     correct_abstention  USD 0.0079 turns 2   spans 0/0
+  DA04 run     correct_abstention  USD 0.0451 turns 11  spans 0/0
+  DA05 run     correct_abstention  USD 0.0083 turns 2   spans 0/0
+  DA06 run     correct_abstention  USD 0.0265 turns 7   spans 0/0
+  DA07 run     correct_abstention  USD 0.0075 turns 2   spans 0/0
+  DA08 run     correct_abstention  USD 0.0078 turns 2   spans 0/0
+  DA09 run     correct_abstention  USD 0.0065 turns 2   spans 0/0
+  DA10 run     correct_abstention  USD 0.0078 turns 2   spans 0/0
+  DA11 run     correct_abstention  USD 0.0068 turns 2   spans 0/0
+  DA12 run     correct_abstention  USD 0.0432 turns 15  spans 0/0
+  DA13 run     correct_abstention  USD 0.0601 turns 13  spans 0/0
+  DA14 run     correct_abstention  USD 0.0470 turns 15  spans 0/0
+  DC01 run     correct             USD 0.0269 turns 6   spans 1/1
+  DC02 run     correct             USD 0.0217 turns 5   spans 1/1
+  DC03 run     correct             USD 0.0184 turns 5   spans 1/1
+  DC04 run     correct             USD 0.0500 turns 10  spans 2/2
+  DC05 run     correct             USD 0.0936 turns 15  spans 2/2
+  DC06 run     correct             USD 0.0218 turns 6   spans 1/1
+  DC07 run     correct             USD 0.0146 turns 4   spans 1/1
+  DC08 run     correct             USD 0.0272 turns 7   spans 1/1
+  DC09 run     correct             USD 0.0170 turns 4   spans 1/1
+  DC10 run     correct             USD 0.0223 turns 5   spans 1/1
+  DC11 run     correct             USD 0.0338 turns 7   spans 1/1
+  DC12 run     correct             USD 0.0200 turns 6   spans 1/1
+development set: not the release gate; no gate verdict (threshold checks for information only: {"abstention_accuracy": true, "citation_integrity": true, "coverage": true, "false_abstention_rate": true, "precision": true})

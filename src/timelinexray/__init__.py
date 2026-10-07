@@ -4,4 +4,4 @@ Independent community analysis of publicly available source code. Not affiliated
 endorsed by X or xAI.
 """
 
-__version__ = "0.10.0"
+__version__ = "0.11.0"

@@ -10,7 +10,7 @@ abstract: >-
 type: software
 authors:
   - alias: "solisolsoli"
-version: "0.10.0"
+version: "0.11.0"
 date-released: "2026-10-02"
 license: Apache-2.0
 repository-code: "https://github.com/solisolsoli/timelinexray"

@@ -1,0 +1,644 @@
+{
+  "schema": "timelinexray/eval-questions/v1",
+  "purpose": "development",
+  "upstream": "https://github.com/xai-org/x-algorithm.git",
+  "status": "development set, written 2026-10-07 before any live run; not the release gate",
+  "description": "Abstention development set. NOT the release gate: it is never scored as the gate, and the gate sets (questions.json, questions-v2.json) were neither changed nor used to tune it. Abstain items are new questions in three families (per-request model outputs and reach, live configuration and production metrics, moderation claims the code does not state); their probes must return no hits. Answer items are controls next to those families, written by reading the code at the pinned commit (no research finding behind them, so source is null), so that a stricter abstention contract cannot score well by abstaining on everything.",
+  "commits": {
+    "indexed": [
+      "77d431aabf409ca1c1eed9bec7e2183f7c914e23"
+    ],
+    "pinned": [
+      "4c5cfe8f07f1c76d4f04277e803f20e6039f5191",
+      "a707cc27ba36d3fa79450c9cffcc48a82d080b02",
+      "77d431aabf409ca1c1eed9bec7e2183f7c914e23"
+    ]
+  },
+  "items": [
+    {
+      "id": "DA01",
+      "kind": "abstain",
+      "family": "per-request",
+      "source": null,
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What score does the VM ranker assign to the newest post of one particular account for one specific viewer who follows that account?",
+      "expected": {
+        "abstention_reason": "per-viewer model output: a score is computed per request from live features and a trained model; neither is in the repository",
+        "probes": [
+          {
+            "query": "score for this viewer",
+            "literal": true
+          },
+          {
+            "query": "vm ranker viewer account newest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "DA02",
+      "kind": "abstain",
+      "family": "per-request",
+      "source": null,
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What probability does the Phoenix model give that one particular follower of mine will reply to my next post?",
+      "expected": {
+        "abstention_reason": "per-viewer prediction: no trained model, request data or inference result is in the repository",
+        "probes": [
+          {
+            "query": "reply probability follower"
+          },
+          {
+            "query": "probability that my",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "DA03",
+      "kind": "abstain",
+      "family": "per-request",
+      "source": null,
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "At which position will a given post appear in one specific viewer's For You feed tomorrow morning?",
+      "expected": {
+        "abstention_reason": "per-request ranking outcome: positions depend on the live candidate set, model outputs and configuration at request time",
+        "probes": [
+          {
+            "query": "feed position tomorrow"
+          },
+          {
+            "query": "position tomorrow",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "DA04",
+      "kind": "abstain",
+      "family": "per-request",
+      "source": null,
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "How many seconds does the Phoenix model predict a specific viewer will dwell on a specific video post?",
+      "expected": {
+        "abstention_reason": "per-viewer prediction: dwell predictions are model outputs for a request; the repository holds model code, not outputs",
+        "probes": [
+          {
+            "query": "predicted dwell viewer"
+          },
+          {
+            "query": "dwell seconds",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "DA05",
+      "kind": "abstain",
+      "family": "per-request",
+      "source": null,
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "How many of my followers will see my next post in their For You feed?",
+      "expected": {
+        "abstention_reason": "reach prediction for one account: the code contains no forecast of who will be served a post",
+        "probes": [
+          {
+            "query": "followers will see"
+          },
+          {
+            "query": "will see my",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "DA06",
+      "kind": "abstain",
+      "family": "live-config",
+      "source": null,
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Is `EnableFavHoldout` (rust_home_mixer_enable_fav_holdout) switched on in X's production configuration right now?",
+      "expected": {
+        "abstention_reason": "live configuration value: the repository holds the public default only; the served value is set by a configuration system",
+        "probes": [
+          {
+            "query": "production enable_fav_holdout"
+          },
+          {
+            "query": "fav_holdout production",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "DA07",
+      "kind": "abstain",
+      "family": "live-config",
+      "source": null,
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What value does X's live configuration currently serve for `NewUserMinEngagementThreshold`?",
+      "expected": {
+        "abstention_reason": "live configuration value: only the public default is in the code",
+        "probes": [
+          {
+            "query": "live new_user_min_engagement_threshold"
+          },
+          {
+            "query": "currently serving",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "DA08",
+      "kind": "abstain",
+      "family": "live-config",
+      "source": null,
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Is the decider `disable_home_mixer_phoenix_ranker` enabled on X's production servers today?",
+      "expected": {
+        "abstention_reason": "live decider state: the code reads the decider at request time; its production state is not in the repository",
+        "probes": [
+          {
+            "query": "disable_home_mixer_phoenix_ranker enabled production"
+          }
+        ]
+      }
+    },
+    {
+      "id": "DA09",
+      "kind": "abstain",
+      "family": "live-config",
+      "source": null,
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "On average, how many candidates did the Thunder source return per For You request yesterday?",
+      "expected": {
+        "abstention_reason": "production metrics: request logs and measured counts are not in the repository",
+        "probes": [
+          {
+            "query": "average candidates yesterday"
+          },
+          {
+            "query": "per request yesterday",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "DA10",
+      "kind": "abstain",
+      "family": "live-config",
+      "source": null,
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Which Phoenix inference cluster serves the largest share of For You users this week?",
+      "expected": {
+        "abstention_reason": "live traffic allocation: the code names a configured cluster and overrides; which one serves most users is not in the repository",
+        "probes": [
+          {
+            "query": "largest share users"
+          },
+          {
+            "query": "share of users",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "DA11",
+      "kind": "abstain",
+      "family": "moderation",
+      "source": null,
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Is my account currently shadowbanned in the For You feed?",
+      "expected": {
+        "abstention_reason": "per-account moderation state: no account data and no shadowban rule are in the code",
+        "probes": [
+          {
+            "query": "shadowbanned"
+          },
+          {
+            "query": "account is shadow",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "DA12",
+      "kind": "abstain",
+      "family": "moderation",
+      "source": null,
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Does the For You ranking demote posts that mention competing social networks?",
+      "expected": {
+        "abstention_reason": "no supporting span: no rule about mentions of other networks occurs in the code; absence of a term is not evidence either way",
+        "probes": [
+          {
+            "query": "competitor"
+          },
+          {
+            "query": "social network",
+            "literal": true
+          },
+          {
+            "query": "mention competitor",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "DA13",
+      "kind": "abstain",
+      "family": "moderation",
+      "source": null,
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Does the home mixer reduce the reach of accounts that bought followers?",
+      "expected": {
+        "abstention_reason": "no supporting span: no rule about purchased followers occurs in the code; absence of a term is not evidence either way",
+        "probes": [
+          {
+            "query": "bought followers"
+          },
+          {
+            "query": "purchased followers",
+            "literal": true
+          },
+          {
+            "query": "fake followers",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "DA14",
+      "kind": "abstain",
+      "family": "moderation",
+      "source": null,
+      "evidence_class": "INFERENCE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Does the For You feed penalise accounts that delete many of their own posts?",
+      "expected": {
+        "abstention_reason": "no supporting span: no penalty for deleting posts occurs in the code; absence of a term is not evidence either way",
+        "probes": [
+          {
+            "query": "deleted posts penalty"
+          },
+          {
+            "query": "deleting posts",
+            "literal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "DC01",
+      "kind": "answer",
+      "family": "control-moderation",
+      "source": null,
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "At the pinned commit, does `AuthorSocialgraphFilter` (home-mixer/filters/author_socialgraph_filter.rs) remove a candidate post whose author the viewer has muted or blocked?",
+      "expected": {
+        "answer_regexes": [
+          "\\A(?!\\W*no\\b)",
+          "\\b(yes|remov\\w*|drop\\w*|filter\\w*( it)? out|exclud\\w*)\\b",
+          "\\bmut",
+          "\\bblock"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/filters/author_socialgraph_filter.rs",
+            "start_line": 45,
+            "end_line": 52,
+            "anchor": "|| blocked",
+            "span_sha256": "09c971e6c160a463434350e4369e42f602e6ae167b12292745f33612f43d1297"
+          }
+        ]
+      }
+    },
+    {
+      "id": "DC02",
+      "kind": "answer",
+      "family": "control-moderation",
+      "source": null,
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "In `ViewerMutedKeywordFilter` (home-mixer/filters/viewer_muted_keyword_filter.rs) at the pinned commit, what happens to the candidates when the viewer has no muted keywords?",
+      "expected": {
+        "answer_regexes": [
+          "(\\bkept\\b|\\bkeeps?\\b|\\bkeeping\\b|\\bretain|pass\\w* through|\\bunchanged\\b|\\breturns? (all|every|them|the)|none (are|is|of them is) removed|nothing (is )?removed|no (candidates? |posts? )?(are |is )?removed|removed: vec!\\[\\]|empty `?removed)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/filters/viewer_muted_keyword_filter.rs",
+            "start_line": 26,
+            "end_line": 33,
+            "anchor": "if muted_keywords.is_empty() {",
+            "span_sha256": "bb4265b545f0fea793bbc5f38a025b62b0c22e0e48651a9a4ad22d7abecc6ceb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "DC03",
+      "kind": "answer",
+      "family": "control-moderation",
+      "source": null,
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "In `AgeFilter` (home-mixer/filters/age_filter.rs) at the pinned commit, is a candidate kept when its age cannot be computed from its post id?",
+      "expected": {
+        "answer_regexes": [
+          "\\A(?!\\W*yes\\b)",
+          "(\\bno\\b|not kept|\\bremov|\\bdropp|filtered out|\\bexclud|unwrap_or\\(false\\))"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/filters/age_filter.rs",
+            "start_line": 16,
+            "end_line": 20,
+            "anchor": ".unwrap_or(false)",
+            "span_sha256": "b9bc51881b54773f6f9434f09bd5ef0ce09a5c1f91cb8de3d8a469267c47efda"
+          }
+        ]
+      }
+    },
+    {
+      "id": "DC04",
+      "kind": "answer",
+      "family": "control-live-config",
+      "source": null,
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What maximum post age does `PhoenixCandidatePipeline` (home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs) pass to its `AgeFilter` at the pinned commit, and where is that constant defined?",
+      "expected": {
+        "answer_regexes": [
+          "(\\b48[ -]?(h\\b|hours?\\b|hrs?\\b)|(?<![\\d.,])172,?800(?![\\d])|48 \\* 60 \\* 60|\\btwo days\\b|\\b2 days\\b)",
+          "(config\\.rs|MAX_POST_AGE)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/config.rs",
+            "start_line": 36,
+            "end_line": 36,
+            "anchor": "MAX_POST_AGE: u64 = 48 * 60 * 60",
+            "span_sha256": "ab738b4000b57dc78618c9dd56522c29ff0d66de80d7f3e9645a889eb1c5814e"
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs",
+            "start_line": 361,
+            "end_line": 361,
+            "anchor": "AgeFilter::new(Duration::from_secs(params::MAX_POST_AGE))",
+            "span_sha256": "d2903babe8b034e4ced43f10d7e64e691eaff7c62b5bc3ca159dda53915a833d"
+          }
+        ]
+      }
+    },
+    {
+      "id": "DC05",
+      "kind": "answer",
+      "family": "control-per-request",
+      "source": null,
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "At the pinned commit, which filter in `PhoenixCandidatePipeline` removes candidates written by the viewer themselves, and what does it compare?",
+      "expected": {
+        "answer_regexes": [
+          "Self[ _-]?Tweet[ _-]?Filter",
+          "author[ _-]?id",
+          "(viewer[ _-]?id|user[ _-]?id|\\bviewer)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/filters/self_tweet_filter.rs",
+            "start_line": 13,
+            "end_line": 16,
+            "anchor": "c.author_id != viewer_id",
+            "span_sha256": "c9129359fcd90ce28f4584e689ba8ed3f810dd185da50b9c94b8e771b46bb3bd"
+          },
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs",
+            "start_line": 362,
+            "end_line": 362,
+            "anchor": "Box::new(SelfTweetFilter)",
+            "span_sha256": "5071d072242d7cf886d8349358fdc87d641b6b49ab853f1962b5d1fc16b322de"
+          }
+        ]
+      }
+    },
+    {
+      "id": "DC06",
+      "kind": "answer",
+      "family": "control-moderation",
+      "source": null,
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Does `OONNsfwSimclustersFilter` (home-mixer/filters/oon_nsfw_simclusters_filter.rs) at the pinned commit remove posts by NSFW-flagged authors that the viewer follows (in-network posts)?",
+      "expected": {
+        "answer_regexes": [
+          "\\A(?!\\W*yes\\b)",
+          "(\\bno\\b|\\bnot\\b|\\bonly\\b)",
+          "(out[ -]of[ -]network|in_network|Some\\(false\\)|not in[ -]network)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/filters/oon_nsfw_simclusters_filter.rs",
+            "start_line": 19,
+            "end_line": 23,
+            "anchor": "c.in_network == Some(false)",
+            "span_sha256": "8805c1932d02cbd317d644754a2e4d5810ad796d37be85bd0efd0bc4bc50524e"
+          }
+        ]
+      }
+    },
+    {
+      "id": "DC07",
+      "kind": "answer",
+      "family": "control-live-config",
+      "source": null,
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of the parameter `EnableFavHoldout` at the pinned commit?",
+      "expected": {
+        "answer_regexes": [
+          "\\b(false|disabled|off)\\b"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 822,
+            "end_line": 827,
+            "anchor": "\"rust_home_mixer_enable_fav_holdout\"",
+            "span_sha256": "27a7520d1b94174c6a4d3b54ffabe5eafb1a9db4bc0b912743682f86d737b7f1",
+            "lookup": {
+              "tool": "get_param",
+              "name": "EnableFavHoldout",
+              "value": "false"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "DC08",
+      "kind": "answer",
+      "family": "control-per-request",
+      "source": null,
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "In `FavHoldoutFilter` (home-mixer/filters/fav_holdout_filter.rs) at the pinned commit, what is the largest holdout percentage in its `STEPS` table?",
+      "expected": {
+        "answer_regexes": [
+          "(?<![\\d.,])15(?![\\d])(?!\\.\\d)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/filters/fav_holdout_filter.rs",
+            "start_line": 10,
+            "end_line": 34,
+            "anchor": "(10000, 15)",
+            "span_sha256": "88e53ddfdad9849158ef6155ce676234285715bb6b366648a6cf36e6d5841dd0"
+          }
+        ]
+      }
+    },
+    {
+      "id": "DC09",
+      "kind": "answer",
+      "family": "control-live-config",
+      "source": null,
+      "evidence_class": "PARAM_DEFAULT",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "What is the public default of `NewUserMinEngagementFilterMaxAccountAgeSecs` at the pinned commit?",
+      "expected": {
+        "answer_regexes": [
+          "((?<![\\d.,])1,?800(?![\\d])(?!\\.\\d)|\\b30 minutes\\b|\\bhalf an hour\\b)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/params/param.rs",
+            "start_line": 683,
+            "end_line": 688,
+            "anchor": "\"rust_home_mixer_new_user_min_engagement_filter_max_account_age_secs\"",
+            "span_sha256": "15f3694ec4d333eb5e5a08e5ec4e462a4d4a9806296594cdfd06b80239096636",
+            "lookup": {
+              "tool": "get_param",
+              "name": "NewUserMinEngagementFilterMaxAccountAgeSecs",
+              "value": "1800"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "DC10",
+      "kind": "answer",
+      "family": "control-per-request",
+      "source": null,
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "At the pinned commit, which two identifiers does `InventoryHoldoutFilter::holdout_bucket` (home-mixer/filters/inventory_holdout_filter.rs) combine, and what range of bucket values can it return?",
+      "expected": {
+        "answer_regexes": [
+          "post[ _-]?id",
+          "viewer[ _-]?id",
+          "(0\\s*(-|\u2013|to|through|and)\\s*99|%\\s*100|modulo 100|mod 100|100 buckets|below 100|less than 100)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/filters/inventory_holdout_filter.rs",
+            "start_line": 31,
+            "end_line": 43,
+            "anchor": "z % 100",
+            "span_sha256": "e0fde22f6ec402159813877a6611dafcf161e96a970675fe9026240a1463f209"
+          }
+        ]
+      }
+    },
+    {
+      "id": "DC11",
+      "kind": "answer",
+      "family": "control-moderation",
+      "source": null,
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Can `NewUserMinEngagementFilter` (home-mixer/filters/new_user_min_engagement_filter.rs) remove an in-network candidate (a post from an account the viewer follows) at the pinned commit?",
+      "expected": {
+        "answer_regexes": [
+          "\\A(?!\\W*yes\\b)",
+          "(\\bno\\b|\\bnever\\b|\\bnot\\b|always (kept|keeps?)|returns? true)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/filters/new_user_min_engagement_filter.rs",
+            "start_line": 64,
+            "end_line": 67,
+            "anchor": "if candidate.in_network != Some(false) {",
+            "span_sha256": "affd6dbe50a0122bb01f2dc70fad59175e71872dd55bfe38b30a5e6d27ebc187"
+          }
+        ]
+      }
+    },
+    {
+      "id": "DC12",
+      "kind": "answer",
+      "family": "control-live-config",
+      "source": null,
+      "evidence_class": "CODE",
+      "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+      "question": "Under which conditions is `PhoenixScorer` (home-mixer/scorers/phoenix_scorer.rs) disabled for a query at the pinned commit (its `enable` method)?",
+      "expected": {
+        "answer_regexes": [
+          "cached[ _-]?posts",
+          "(kill[ _-]?switch|disable_home_mixer_phoenix_ranker|decider)"
+        ],
+        "citations": [
+          {
+            "commit": "77d431aabf409ca1c1eed9bec7e2183f7c914e23",
+            "path": "home-mixer/scorers/phoenix_scorer.rs",
+            "start_line": 65,
+            "end_line": 74,
+            "anchor": "if query.has_cached_posts {",
+            "span_sha256": "88ae5f40c1d96628b78576aef799f5ee8042774d9cbe424983f176444d455756"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -8,7 +8,9 @@ listed here in the order ``tools/list`` shows them:
 * :mod:`.params` - ``get_param``, ``param_history``: parameter declarations with their
   public defaults at a commit and over the pinned commits (P7 tools, since 0.9.0);
 * :mod:`.findings` - ``find_findings``, ``get_finding``, ``verify_claim`` (Milestone 4b):
-  read-only access to the findings ledger the operator configured.
+  read-only access to the findings ledger the operator configured;
+* :mod:`.stale` - ``stale_worklist``: the stale-review worklist of that ledger
+  (``txray findings stale --json``), read only.
 
 A new tool group is a module with the same shape - tools built on :class:`.base.Tool`,
 returning :class:`.base.ToolResult` inside the common envelope, reading only through
@@ -23,7 +25,7 @@ package.
 
 from __future__ import annotations
 
-from . import code, findings, params, pins
+from . import code, findings, params, pins, stale
 from .base import (
     ANNOTATIONS,
     OUTCOMES,
@@ -36,7 +38,7 @@ from .base import (
 )
 
 #: Tool modules in listing order.
-TOOL_MODULES = (pins, code, params, findings)
+TOOL_MODULES = (pins, code, params, findings, stale)
 
 
 def build_registry() -> Registry:

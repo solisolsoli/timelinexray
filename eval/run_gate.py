@@ -14,7 +14,8 @@ report carries every denominator.
 
 The default question file is the newest set revision (``questions-v2.json``, revision 2);
 revision 1 (``questions.json``) is kept unchanged with its live-run results and is checked
-with ``--questions eval/questions.json``.
+with ``--questions eval/questions.json``. A *development* set (``"purpose": "development"``,
+``eval/dev-abstain.json``) is checked the same way; it is never the release gate.
 
 The store must hold the question set's pinned commits (``commits.pinned``) with the code
 index built for ``commits.indexed`` (``txray pin`` / ``txray index``). The harness is a
@@ -47,6 +48,12 @@ EVIDENCE_CLASSES = ("CODE", "PARAM_DEFAULT", "REPO_DOC", "OFFICIAL", "THIRD_PART
                     "EMPIRICAL", "INFERENCE")
 LOOKUP_TOOLS = ("get_param", "find_symbols")
 ITEM_KEYS = {"id", "kind", "source", "evidence_class", "commit", "question", "expected"}
+#: ``purpose`` of a question set: the release ``gate`` (the default when absent) or a
+#: ``development`` set, which is never scored as the gate. A development set's items carry a
+#: ``family`` label, ids starting with ``D``, and answer items need no research finding.
+PURPOSES = ("gate", "development")
+DEV_ITEM_KEYS = ITEM_KEYS | {"family"}
+DEV_ID_RE = re.compile(r"^D[A-Z]?[0-9]{2}$")
 CITATION_KEYS = {"commit", "path", "start_line", "end_line", "anchor", "span_sha256", "lookup"}
 ANSWER_EXPECTED_KEYS = {"answer_regexes", "citations"}
 ABSTAIN_EXPECTED_KEYS = {"abstention_reason", "probes"}
@@ -182,6 +189,12 @@ def validate(data: Any) -> list[str]:
     for key in ("upstream", "status", "description", "commits", "items"):
         if key not in data:
             problems.append(f"missing top-level member {key!r}")
+    purpose = data.get("purpose", "gate")
+    if purpose not in PURPOSES:
+        problems.append(f"purpose must be one of {PURPOSES}")
+    development = purpose == "development"
+    if development and "not the release gate" not in str(data.get("status", "")):
+        problems.append("a development set's status must say it is not the release gate")
     commits = data.get("commits") or {}
     pinned = set(commits.get("pinned") or [])
     indexed = set(commits.get("indexed") or [])
@@ -197,10 +210,15 @@ def validate(data: Any) -> list[str]:
         problems.append(f"{len(items)} items; expected {MIN_ITEMS}-{MAX_ITEMS}")
     seen: set[str] = set()
     for item in items:
-        problems.extend(_validate_item(item, seen, pinned, indexed))
+        problems.extend(_validate_item(item, seen, pinned, indexed, development=development))
     if "revision" in data:
         problems.extend(_validate_revision(data["revision"], seen))
     return problems
+
+
+def is_development(data: Mapping[str, Any]) -> bool:
+    """Whether the set is a development set (never the release gate)."""
+    return data.get("purpose") == "development"
 
 
 def revision_number(data: Mapping[str, Any]) -> int:
@@ -256,17 +274,24 @@ def _validate_revision(revision: Any, ids: set[str]) -> list[str]:
     return problems
 
 
-def _validate_item(item: Any, seen: set[str], pinned: set[str], indexed: set[str]) -> list[str]:
+def _validate_item(item: Any, seen: set[str], pinned: set[str], indexed: set[str], *,
+                   development: bool = False) -> list[str]:
     if not isinstance(item, dict):
         return ["item is not an object"]
     label = str(item.get("id", "?"))
     problems: list[str] = []
-    extra = set(item) - ITEM_KEYS
+    keys = DEV_ITEM_KEYS if development else ITEM_KEYS
+    extra = set(item) - keys
     if extra:
         problems.append(f"{label}: unexpected members {sorted(extra)}")
-    for key in ITEM_KEYS:
+    for key in keys:
         if key not in item:
             problems.append(f"{label}: missing {key!r}")
+    if development:
+        if not DEV_ID_RE.match(label):
+            problems.append(f"{label}: development item ids start with D (e.g. DA01)")
+        if not isinstance(item.get("family"), str) or not item.get("family", "").strip():
+            problems.append(f"{label}: family must be a non-empty string")
     if label in seen:
         problems.append(f"{label}: duplicate id")
     seen.add(label)
@@ -275,7 +300,7 @@ def _validate_item(item: Any, seen: set[str], pinned: set[str], indexed: set[str
     source = item.get("source")
     if source is not None and not SOURCE_RE.match(str(source)):
         problems.append(f"{label}: source {source!r} is not a finding id")
-    if item.get("kind") == "answer" and source is None:
+    if item.get("kind") == "answer" and source is None and not development:
         problems.append(f"{label}: an answer item needs a source finding")
     if item.get("evidence_class") not in EVIDENCE_CLASSES:
         problems.append(f"{label}: evidence_class must be one of {EVIDENCE_CLASSES}")
@@ -514,6 +539,7 @@ def summarize(data: dict[str, Any], checks: list[Check]) -> dict[str, Any]:
             "probes": sum(len(item["expected"].get("probes", [])) for item in items),
             "status": data.get("status"),
             "revision": revision_number(data),
+            "purpose": data.get("purpose", "gate"),
         },
         "checks": {kind: dict(row) for kind, row in sorted(by_kind.items())},
         "passed": sum(check.ok for check in checks),
@@ -531,13 +557,17 @@ def format_report(report: dict[str, Any]) -> str:
         f"{questions['probes']} abstention probes; revision {questions.get('revision', 1)}; "
         f"status: {questions['status']}",
     ]
+    if questions.get("purpose") == "development":
+        lines.append("  development set: these checks are not the release gate")
     for kind, row in report["checks"].items():
         lines.append(f"  {kind:<13} {row['passed']} / {row['total']}")
     for scope in report.get("search_scope", []):
         lines.append(f"  probe scope: {scope}")
     for failure in report["failures"]:
         lines.append(f"  FAIL {failure['item']} {failure['kind']} {failure['target']}: {failure['detail']}")
-    lines.append(f"semantic gate (deterministic): {'PASS' if report['ok'] else 'FAIL'} "
+    label = ("development set (deterministic, not the gate)"
+             if questions.get("purpose") == "development" else "semantic gate (deterministic)")
+    lines.append(f"{label}: {'PASS' if report['ok'] else 'FAIL'} "
                  f"{report['passed']} / {report['total']} checks")
     return "\n".join(lines)
 

@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from timelinexray.diff import CLASSES, DiffEngine, SymbolSource, rules
+from timelinexray.diff import CLASSES, DiffEngine, SymbolSource, content, rules
 from timelinexray.diff.analysis import BlobAnalysis
 from timelinexray.diff.hunks import align_hunks, apply_hunks, line_hunks, split_lines
 from timelinexray.diff.model import Hunk
@@ -468,6 +468,218 @@ class ClassifierV2Test(unittest.TestCase):
         self.assertEqual(reasons, {"svc/run.rs": ("unknown", "no-rule"),
                                    "kern/k.cu": ("unknown", "not-parsed"),
                                    "tool.sh": ("unknown", "not-parsed")})
+
+
+class ScoringNameRuleTest(unittest.TestCase):
+    """Classifier v3 scoring-name rule: whole words, two excluded system names, and only
+    symbols that enclose a changed production line (hand check in docs/updates.md)."""
+
+    def _diff(self, old: dict[str, bytes], new: dict[str, bytes]):
+        fixture = _Fixture([old, new])
+        self.addCleanup(fixture.cleanup)
+        return DiffEngine(fixture.store).diff(*fixture.commits)
+
+    def test_whole_words_name_scoring(self) -> None:
+        for name in ("home-mixer/scorers/author_cold_start.rs", "vm-ranker/scoring/value_model.rs",
+                     "PhoenixScorer::score", "PhoenixScores::from", "CandidateScoringInputs",
+                     "util/rescore.rs", "side_effects/reranking_effect.rs", "vqv_weight",
+                     "ScoredTweet", "HTTPScorer", "ads/safe_gap_blender.rs", "POST_ANN_MIN_SCORE",
+                     "time_decay", "calibration.py", "ranking"):
+            with self.subTest(name):
+                self.assertTrue(rules.is_scoring_name(name))
+        for name in ("phoenix-rankall/src/consumer/kafka.rs", "UNSCORED_AUTHOR_FALLBACK_METRIC",
+                     "util/lightweight.rs", "outrank_check", "scorecard.rs", "", None):
+            with self.subTest(name):
+                self.assertFalse(rules.is_scoring_name(name))
+        self.assertEqual(rules.name_words("PhoenixRankAll/vm_ranker-fa4.rs"),
+                         ["phoenix", "rank", "all", "vm", "ranker", "fa", "4", "rs"])
+
+    def test_page_rank_and_rank_all_are_not_scoring_names(self) -> None:
+        for name in ("botmaker-rules/HighPageRankThreshold.df", "fetch_high_page_rank_v2",
+                     "RISKY_HIGH_VIZ_REPLY_EXEMPT_MIN_PAGE_RANK_SCORE", "pagerank_score.py",
+                     "phoenix_rank_all/phoenixRankAllCandidateProcessor.strato",
+                     "phoenix-rankall/src/processor/gen/scored_candidate.rs"):
+            with self.subTest(name):
+                self.assertFalse(rules.is_scoring_name(name))
+
+    def test_excluded_phrases_are_adjacent_words_and_exclude_the_whole_name(self) -> None:
+        self.assertFalse(rules.is_scoring_name("rank_all_candidates_by_score_later"))
+        self.assertTrue(rules.is_scoring_name("rank_candidates_all"))
+        self.assertTrue(rules.is_scoring_name("page_size_rank"))
+
+    def test_an_insertion_does_not_take_its_neighbours_name(self) -> None:
+        body = b"pub fn run() -> u8 {\n    1\n}\n"
+        old = {"svc/source.rs": b"const MIN_SCORE: f64 = 0.5;\n" + body,
+               "svc/combine.rs": b"pub fn combine_scores(a: u8) -> u8 {\n    a\n}\n"}
+        new = {"svc/source.rs": b"const MIN_SCORE: f64 = 0.5;\nconst MAX_AGE: u64 = 9;\n" + body,
+               "svc/combine.rs": b"pub fn combine_scores(a: u8) -> u8 {\n    let b = a;\n    b\n}\n"}
+        found = {(i.path, i.change_class, json.dumps(i.detail.get("matched_by")))
+                 for i in self._diff(old, new).items}
+        self.assertEqual(found, {
+            # the added constant's only scoring-named neighbour is not part of the change
+            ("svc/source.rs", "unknown", "null"),
+            # a line added inside a scoring-named function still takes its name
+            ("svc/combine.rs", "scoring-logic",
+             json.dumps([{"rule": "symbol", "name": "combine_scores"}])),
+        })
+
+    def test_a_test_name_does_not_decide_a_production_line(self) -> None:
+        head = b"pub fn dedup() -> u8 {\n    1\n}\n"
+        tests_module = (b"#[cfg(test)]\nmod tests {\n    #[test]\n    fn keeps_highest_score() {\n"
+                        b"        assert_eq!(super::dedup(), 1);\n    }\n}\n")
+        old = {"svc/dedup.rs": head}
+        new = {"svc/dedup.rs": head + b"const LIMIT: u8 = 2;\n" + tests_module}
+        [item] = self._diff(old, new).items
+        self.assertEqual((item.change_class, item.detail), ("unknown", {"unknown_reason": "no-rule"}))
+        # a hunk entirely inside the test module is still test-only
+        changed = new["svc/dedup.rs"].replace(b"1);", b"2);")
+        [test_item] = self._diff(new, {"svc/dedup.rs": changed}).items
+        self.assertEqual(test_item.change_class, "test-only")
+
+
+class ContentRulesTest(unittest.TestCase):
+    """Classifier v3 content rules (what the changed lines do): observability, data-type,
+    visibility-rule, access-modifier; each with the cases it must not take."""
+
+    def _classes(self, old: dict[str, bytes], new: dict[str, bytes]) -> dict[str, set[str]]:
+        fixture = _Fixture([old, new])
+        self.addCleanup(fixture.cleanup)
+        found: dict[str, set[str]] = {}
+        for item in DiffEngine(fixture.store).diff(*fixture.commits).items:
+            found.setdefault(item.path, set()).add(item.change_class)
+        return found
+
+    def _check(self, cases: dict[str, tuple[bytes, bytes, str]]) -> None:
+        found = self._classes({p: c[0] for p, c in cases.items()}, {p: c[1] for p, c in cases.items()})
+        self.assertEqual(found, {path: {case[2]} for path, case in cases.items()})
+
+    def test_observability_takes_log_and_metric_statements(self) -> None:
+        fn = b"pub fn run(x: u8) -> u8 {\n%s    x\n}\n"
+        self._check({
+            "svc/a.rs": (fn % b'    info!(\n        "x={}",\n        x\n    );\n',
+                         fn % b'    info!(\n        "x={} y",\n        x + 1\n    );\n', "observability"),
+            "svc/b.rs": (fn % b"", fn % b'    tracing::warn!(x, "slow");\n    REQUESTS.with_label_values(&["a"]).inc();\n',
+                         "observability"),
+            "svc/c.rs": (b"lazy_static! {\n}\n",
+                         b'lazy_static! {\n    pub static ref HITS: IntCounter = register_int_counter!(\n'
+                         b'        "hits", "help"\n    )\n    .unwrap();\n}\n', "observability"),
+            "svc/d.py": (b"def run(x):\n    logger.info('x %s', x)\n    return x\n",
+                         b"def run(x):\n    logger.info('x=%s', x)\n    Metrics.histogram('a').record(x)\n    return x\n",
+                         "observability"),
+            "svc/E.java": (b"class E {\n  int f(int x) {\n    log.info(\"a\");\n    return x;\n  }\n}\n",
+                           b"class E {\n  int f(int x) {\n    log.info(\"b {}\", x);\n    return x;\n  }\n}\n",
+                           "observability"),
+            "svc/f.scala": (b"object F {\n  def f(x: Int): Int = {\n    x\n  }\n}\n",
+                            b'object F {\n  def f(x: Int): Int = {\n    stats.counter("calls").incr()\n    x\n  }\n}\n',
+                            "observability"),
+        })
+
+    def test_observability_never_takes_other_code(self) -> None:
+        fn = b"pub fn run(x: u8) -> u8 {\n%s    x\n}\n"
+        self._check({
+            # a log line and a code line in one hunk
+            "svc/a.rs": (fn % b'    info!("a");\n', fn % b'    info!("b");\n    let y = x;\n', "unknown"),
+            # a log call in the same line as a block header
+            "svc/b.rs": (fn % b"", fn % b'    if x > 1 { warn!("big") }\n', "unknown"),
+            # a macro name inside a string is not a call
+            "svc/c.rs": (fn % b'    let s = "a";\n', fn % b'    let s = "info!(x)";\n', "unknown"),
+            # a binding of a log call is not a bare telemetry statement
+            "svc/d.rs": (fn % b"", fn % b'    let _ = info!("a");\n', "unknown"),
+            # "metric" and "stats" alone name ranking data in this upstream: only call shapes
+            # of logging and metrics libraries count
+            "svc/m.rs": (fn % b"    let v = metric_value(c, Metric::Likes, true);\n",
+                         fn % b"    let v = metric_value(c, Metric::Replies, false);\n", "unknown"),
+            "svc/n.rs": (fn % b"", fn % b"    STATE.set(x);\n    METRIC_CACHE.insert(x);\n", "unknown"),
+            "svc/o.py": (b"def run(x):\n    return x\n",
+                         b"def run(x):\n    stats.update(x)\n    metrics.append(x)\n    return x\n", "unknown"),
+            "svc/p.scala": (b"object P {\n  def f(x: Int): Int = {\n    x\n  }\n}\n",
+                            b"object P {\n  def f(x: Int): Int = {\n    stats.add(x)\n    x\n  }\n}\n",
+                            "unknown"),
+            # print() is not telemetry
+            "svc/e.py": (b"def run(x):\n    return x\n", b"def run(x):\n    print(x)\n    return x\n", "unknown"),
+            # a comment-only change stays cosmetic; a scoring path keeps its name rule
+            "svc/f.rs": (fn % b"    // info!(a)\n", fn % b"    // info!(b)\n", "cosmetic"),
+            "scorers/g.rs": (fn % b'    info!("a");\n', fn % b'    info!("b");\n', "scoring-logic"),
+        })
+
+    def test_data_type_takes_fields_variants_and_attributes(self) -> None:
+        self._check({
+            "svc/a.rs": (b"pub struct A {\n    x: u8,\n}\n", b"pub struct A {\n    x: u8,\n    y: Option<u64>,\n}\n",
+                         "data-type"),
+            "svc/b.rs": (b"enum B {\n    One,\n}\n", b"enum B {\n    One,\n    Two(u8),\n}\n", "data-type"),
+            "svc/c.rs": (b"#[derive(Clone)]\nstruct C;\n", b"#[derive(Clone, Copy, Debug)]\nstruct C;\n", "data-type"),
+            "svc/d.rs": (b"struct D<'a>(&'a [String]);\n", b"struct D<'a>(&'a [&'a str]);\n", "data-type"),
+        })
+
+    def test_data_type_never_takes_values_code_or_other_languages(self) -> None:
+        self._check({
+            # an enum discriminant and an attribute default assign values
+            "svc/a.rs": (b"enum A {\n    One = 1,\n}\n", b"enum A {\n    One = 2,\n}\n", "unknown"),
+            "svc/b.rs": (b"struct B {\n    #[arg(long, default_value_t = 1)]\n    n: u8,\n}\n",
+                         b"struct B {\n    #[arg(long, default_value_t = 2)]\n    n: u8,\n}\n", "unknown"),
+            # a field and a function body in one hunk
+            "svc/c.rs": (b"struct A { x: u8 }\nfn f() -> u8 { 1 }\n", b"struct A { x: u16 }\nfn f() -> u8 { 2 }\n",
+                         "unknown"),
+            # Java enums and Python classes hold code: not this rule
+            "svc/D.java": (b"enum D {\n  ONE;\n}\n", b"enum D {\n  ONE, TWO;\n}\n", "unknown"),
+            "svc/e.py": (b"class E:\n    x: int\n", b"class E:\n    x: int\n    y: str\n", "unknown"),
+        })
+
+    def test_visibility_rule_takes_rule_declarations(self) -> None:
+        self._check({
+            "rules/a.rs": (b"const LOGGED_OUT: Condition = viewer(ViewerPredicate::LoggedOut);\n",
+                           b"const LOGGED_OUT: Condition = not(viewer(ViewerPredicate::LoggedIn));\n",
+                           "visibility-rule"),
+            "rules/b.rs": (b"pub(super) fn drops() -> Vec<RuleClause> {\n    rule(RuleId::A, drop_post(R::A))\n}\n",
+                           b"pub(super) fn drops() -> Vec<RuleClause> {\n    rule(RuleId::B, drop_post(R::A))\n}\n",
+                           "visibility-rule"),
+            "rules/c.rs": (b"fn blurs(r: Reason) -> [Clause; 2] {\n    [blur(r), age(r)]\n}\n",
+                           b"fn blurs(r: Reason) -> [Clause; 2] {\n    [blur(r), prompt(r)]\n}\n",
+                           "visibility-rule"),
+            "rules/d.rs": (b"const ALL: [Predicate; 1] = [Predicate::A];\n",
+                           b"const ALL: [Predicate; 2] = [Predicate::A, Predicate::B];\n", "visibility-rule"),
+        })
+
+    def test_visibility_rule_needs_the_declared_type(self) -> None:
+        self._check({
+            # returns a verdict, takes a clause, or declares another type: not a rule definition
+            "rules/a.rs": (b"fn decide(c: &RuleClause) -> Verdict {\n    Verdict::Keep\n}\n",
+                           b"fn decide(c: &RuleClause) -> Verdict {\n    Verdict::Drop\n}\n", "unknown"),
+            "rules/b.rs": (b"fn new(clauses: Vec<RuleClause>) -> Self {\n    Self { clauses }\n}\n",
+                           b"fn new(clauses: Vec<RuleClause>) -> Self {\n    Self { clauses: vec![] }\n}\n",
+                           "unknown"),
+            "rules/c.rs": (b"const LEVELS: [(RuleId, Label); 1] = [(RuleId::A, Label::B)];\n",
+                           b"const LEVELS: [(RuleId, Label); 1] = [(RuleId::A, Label::C)];\n", "unknown"),
+            # a model/config location keeps its path rule
+            "models/d.rs": (b"const X: Condition = a();\n", b"const X: Condition = b();\n", "model-config"),
+        })
+        self.assertFalse(content.is_rule_declaration("function", "fn name(x: &RuleClause) -> &'static str"))
+        self.assertFalse(content.is_rule_declaration("struct", "pub struct Condition"))
+
+    def test_access_modifier_only(self) -> None:
+        fn = b"fn run(x: u8) -> u8 {\n    x\n}\n"
+        self._check({
+            "svc/a.rs": (fn, b"pub(crate) " + fn, "access-modifier"),
+            "svc/b.rs": (b"pub(in crate::x) " + fn, fn, "access-modifier"),
+            "svc/C.java": (b"class C {\n  private int f() { return 1; }\n}\n",
+                           b"class C {\n  public int f() { return 1; }\n}\n", "access-modifier"),
+            "svc/d.scala": (b"object D {\n  private[svc] def f: Int = 1\n}\n",
+                            b"object D {\n  def f: Int = 1\n}\n", "access-modifier"),
+            # a modifier and another token, a pure insertion, Python: not this rule
+            "svc/e.rs": (fn, b"pub " + fn.replace(b"    x", b"    x + 1"), "unknown"),
+            "svc/f.rs": (fn, fn + b"\npub fn other() -> u8 {\n    1\n}\n", "unknown"),
+            "svc/g.py": (b"def run(x):\n    return x\n", b"def run(x):\n    return x + 1\n", "unknown"),
+        })
+        self.assertEqual(content.without_access_modifiers(("pub", "(", "crate", ")", "fn"), "rust"), ("fn",))
+        self.assertIsNone(content.without_access_modifiers(("def",), "python"))
+
+    def test_statement_splitting_on_masked_code(self) -> None:
+        code = 'fn f() {\n    info!("a;b");\n    if x { warn!("c") }\n}\n'
+        from timelinexray.syntax.source import mask
+        masked = mask(code, "rust").code
+        texts = [(" ".join(masked[a:b].split()), simple) for a, b, simple in content.statements(masked, "rust")]
+        self.assertEqual(texts, [("fn f() {", False), ("info!( );", True), ("if x {", False),
+                                 ("warn!( )", True)])
 
 
 class HunkTest(unittest.TestCase):

@@ -64,9 +64,10 @@ the package version are three separate identifiers.
 | --- | --- |
 | `server/discover` | Modern only. `supportedVersions` `["2026-07-28", "2025-11-25"]`, capabilities `{"tools": {"listChanged": false}}`, `instructions`, `ttlMs` 3600000, `cacheScope` `"public"`. |
 | `initialize` | Legacy. Answers `protocolVersion` `2025-11-25` whatever was asked (a client that cannot use it disconnects, per 2025-11-25), plus capabilities, `serverInfo`, `instructions`. |
+| (`instructions`) | The evidence rules in one paragraph, ending with the answer-or-abstain rules R1-R4 of [agents/README.md](agents/README.md#answer-or-abstain-rules-r1-r4) (request-time values are not in the code; rules need a span that states them; stop after two unproductive searches in a row or eight in all; an abstention states its scope). |
 | `notifications/initialized`, any notification | Accepted, never answered. |
 | `ping` | Legacy only: `{}`. With modern `_meta`: `-32601` (removed in 2026-07-28). |
-| `tools/list` | The twelve tools in a fixed order, one page (a cursor is `-32602`). Modern results add `ttlMs`/`cacheScope`. |
+| `tools/list` | The thirteen tools in a fixed order, one page (a cursor is `-32602`). Modern results add `ttlMs`/`cacheScope`. |
 | `tools/call` | Arguments validated against the tool's `inputSchema`, then run under the time budget. |
 | anything else | `-32601`. The server never sends requests or notifications. |
 
@@ -97,6 +98,7 @@ below.
 | `find_findings` | `query` (<= 512 chars, <= 16 terms), `component`, `statuses`, `evidence_classes`, `freshness`, `workflows`, `commit` (40 hex, pinned), `current_only` (default `true`), `limit` (1-20, default 10), `cursor` | Findings of the configured ledger in ledger order, each with id, title, claim, component, evidence class and scope; `status` with `status_basis` (`proposed`, `reported`, `reviewed`), `reviewed`, `status_by`; `workflow`; `current`; `freshness` (`value`, the `commit` it refers to, `check` `integrity`/`reanchor`, the verify `event` hash); citations; `value_note` "public default at commit ..." for `PARAM_DEFAULT`; review state (number of reviews, last reviewed status and event, open queue triggers); `superseded_by`; `not_current` counts of matches left out by `current_only`; `search_scope`; the ledger head. |
 | `get_finding` | **`finding_id`**, `commit` | The same summary plus limitations, web sources, report attributes, the negative search, dependencies, provenance revisions (spans re-anchored on later commits), every verification check (event, sequence number, time, mode, target, freshness, verdict, reasons) and review (actor, status, rationale, objections) with event hashes, open queue items, supersession, retraction, the finding's event history newest first (sequence number, type, time, actor, event hash) and the ledger head (`head`, `events`). |
 | `verify_claim` | `finding_id` **or** `citations` (1-8 of `commit`, `path`, `start_line`, `end_line`, `anchor`, optional `span_sha256`), `target_commit` | Every cited span re-read now with `timelinexray.verify.Verifier`: integrity at its own commit (`INTACT`/`CHANGED`/`MISSING`, reason, anchor verdict, baseline, freshness, observed span SHA-256) and, with `target_commit`, re-anchoring (`identical`, `unchanged`, `relocated`, `changed`, `ambiguous`, `missing`, `unusable`, with the current span, the proposed region of a changed span and candidates); for a finding also its dependencies and negative search, and the ledger's recorded check of the same scope (`recorded`, `matches_recorded`). Overall `at_cited` / `at_target` freshness; `semantic_verdict` is always `NOT_ASSESSED`; `ledger_written` is always `false`. |
+| `stale_worklist` | `target` (40 hex, pinned; default: the newest pin), `area` (`parameter`, `scoring`, `other`), `limit` (1-20, default 5), `cursor` | The stale-review worklist of the configured ledger, the same data as `txray findings stale --json` (see [findings-memory.md](findings-memory.md), "Stale review"): `counts`, `batch` steps (findings, commits, command, effect), and per finding not `CURRENT` at the target its rank, area, priority, freshness, status, workflow, the check event, every non-current citation (old span, the located or line-diff-aligned candidate with SHA-256 and anchor verdict, occurrences, where the anchor occurs), dependencies, negative search, unpinned commits, whether a successor draft is possible and the `read` / `decide` commands; `total`, `offset`, `returned`; the ledger head. Commands carry no `--store`/`--ledger`; nothing is written and no draft file is produced. |
 
 `txray mcp tools --json` prints the tool definitions exactly as `tools/list` publishes them
 (JSON Schema 2020-12, a strict subset: see `timelinexray/mcp/schema.py`, which also supports
@@ -110,14 +112,16 @@ local `$defs`/`$ref`). Each tool has two output schemas (Milestone 6):
 - the **published** `outputSchema` in `tools/list`: a relaxation of the strict one
   (`schema.published_output`). The envelope and the `data` object are exact (closed, every
   member required, all constraints); below that only the shape is kept (member names, JSON
-  types, `enum`, `const`), as deep as fits a budget of 2,200 bytes per tool and always at
+  types, `enum`, `const`), as deep as fits a budget of 2,100 bytes per tool and always at
   least the members of `data`; deeper objects and arrays give only their type;
   descriptions are dropped; repeated shapes become `$defs` entries. Any value valid under
   the strict schema is valid under the published one.
 
-This keeps the whole `tools/list` response at about 38.2 KB of the 64 KiB line with twelve
-tools (about 34.3 KB with ten tools and a 2,600-byte budget; about 61.8 KB with the full
-schemas). The published list is pinned by
+This keeps the whole `tools/list` response at about 39.9 KB of the 64 KiB line with thirteen
+tools (38.0 KB with twelve tools and a 2,200-byte budget; about 34.3 KB with ten tools and a
+2,600-byte budget; about 61.8 KB with the full schemas). The budget went from 2,200 to 2,100
+bytes with `stale_worklist`; of the existing tools only `manifest_summary` lost depth (its
+`pin`, `counts` and `licenses` members are published as plain objects and arrays). The published list is pinned by
 `tests/mcp_tools_list.json`; a contract change must regenerate it deliberately:
 `PYTHONPATH=src python3 -m timelinexray mcp tools --json > tests/mcp_tools_list.json`.
 
@@ -160,7 +164,8 @@ only when the pin's upstream is the allowlisted GitHub URL; for `file://` mirror
 | `find_findings` | 20 findings per page, 20 citations per finding, 16 query terms | `total` counts every match; findings left out by `current_only` are counted in `not_current`. |
 | `get_finding` | 20 citations, dependencies, checks, reviews and queue items; 10 provenance revisions; 100 history events (newest first) | Marked with `TRUNCATED:` warnings; `history` is the list the server shortens to fit the response line. |
 | `verify_claim` | 8 given citations; 20 results listed (the freshness covers all) | The time budget covers every blob read. |
-| `tools/list` | about 38.2 KB of the 64 KiB response line with twelve tools (34.3 KB with ten; 61.8 KB before Milestone 6) | A test fails at 40,000 bytes (`tests/test_mcp_findings.py`). |
+| `tools/list` | about 39.9 KB of the 64 KiB response line with thirteen tools (38.0 KB with twelve; 34.3 KB with ten; 61.8 KB before Milestone 6) | A test fails at 40,000 bytes (`tests/test_mcp_findings.py`); `stale_worklist`'s definition must stay under 2,400 bytes (`tests/test_mcp_stale.py`). |
+| `stale_worklist` | 20 entries per page (default 5); per entry 10 citations, 5 occurrences, 10 dependencies, 20 read commands; 50 finding ids per batch step; titles 300 and reasons 1,000 characters | `citations_total` and `findings_total` give the full counts. |
 
 Cursors are `base64url(payload).hmac`: the payload binds tool, commit, index generation, a
 hash of all other arguments and the offset; the HMAC-SHA256 key is random per server
@@ -202,7 +207,7 @@ process. A cursor from another query, commit, generation, tool or process is ref
   the findings tools take ids, commits and repository-relative paths only. The ledger
   directory is fixed at start; `events.jsonl`, `HEAD` and `.lock` must resolve inside it and
   be regular files (a symlink out of it or a FIFO is `DENIED`). Every call re-reads the log
-  through `FindingsMemory(Ledger(dir), store).view()`, which re-verifies the whole hash
+  through `Ledger(dir).events()` (projected as `FindingsMemory.view()` does), which re-verifies the whole hash
   chain (a damaged log is the tool error `integrity_error`), holding a shared `flock` on an
   existing `.lock` so a concurrent writer is never seen half-way. Nothing is written: no
   event, no `HEAD`, no lock file (the suite compares the ledger's names, bytes, sizes and
@@ -242,6 +247,8 @@ was the starting point. Differences, and why:
 Milestone 4b (`src/timelinexray/mcp/tools/findings.py`) serves the findings memory of
 Milestone 3 (see [findings-memory.md](findings-memory.md)) read-only. Findings are recorded,
 verified, re-anchored and reviewed only with `txray findings ...` outside the server.
+`stale_worklist` (`src/timelinexray/mcp/tools/stale.py`) serves the stale-review worklist of
+the same ledger through the same guarded, chain-verified read: a worklist, not a verdict.
 
 - **Three separate fields.** Every finding carries its evidence `status` with
   `status_basis` (`proposed` by its author, `reported` by an imported research report,

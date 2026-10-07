@@ -2,7 +2,7 @@
 
 ## Status
 
-TimelineXray is a public alpha (0.10.0, not yet tagged). Only the latest commit on the
+TimelineXray is a public alpha (0.11.0, tag v0.11.0). Only the latest commit on the
 default branch is supported.
 
 ## Reporting a vulnerability
@@ -11,7 +11,7 @@ Report suspected vulnerabilities privately through GitHub's private vulnerabilit
 reporting (Security tab, "Report a vulnerability"). Do not open a public issue. Please include the version (`txray --version`), the command or API call,
 and the smallest input that reproduces the problem.
 
-## Threat model (0.10.0)
+## Threat model (0.11.0)
 
 TimelineXray runs on the user's own machine. It reads an upstream repository it does not
 control, serves evidence to AI agents it does not control, and keeps two kinds of local

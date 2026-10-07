@@ -7,7 +7,7 @@
 The ledger is chosen by the server operator (``txray mcp serve --ledger DIR``, else
 ``$TXRAY_FINDINGS``, else ``<store>/findings``); a client never names a location. Every call
 reads the event log afresh through the read-only projection
-``FindingsMemory(Ledger(dir), store).view()``, which re-verifies the whole hash chain and
+``project(Ledger(dir).events())``, which re-verifies the whole hash chain and
 refuses a damaged log. When the ledger's lock file exists the read holds a shared lock on
 it, so a concurrent writer is never seen half-way; nothing is ever written - no event, no
 ``HEAD``, and no lock file is created.
@@ -44,7 +44,7 @@ from pathlib import Path
 from typing import Any
 
 from ...errors import InvalidInput, NotFound, Refused, TxrayError
-from ...findings import FindingsMemory, FindingState, Ledger, View
+from ...findings import Event, FindingState, Ledger, View, project
 from ...findings.freshness import (
     NEWER_PIN_UNCHECKED,
     NEWER_PINS_SHOWN,
@@ -279,6 +279,11 @@ def _shared_lock(path: Path) -> Iterator[None]:
 
 def open_view(ctx: ToolContext) -> View:
     """The verified, projected view of the configured ledger (read only)."""
+    return project(open_events(ctx))
+
+
+def open_events(ctx: ToolContext) -> list[Event]:
+    """Every event of the configured ledger after a full hash-chain check (read only)."""
     guard = ctx.guard
     root = guard.ledger_root
     if root is None:
@@ -295,11 +300,10 @@ def open_view(ctx: ToolContext) -> View:
         if os.path.lexists(path):
             guard.inside_ledger(path, f"the ledger's {name}")
         present[name] = _regular(path, f"the ledger's {name}")
-    memory = FindingsMemory(Ledger(root), ctx.store, ctx.index)
     with _shared_lock(root / LOCK_FILE) if present[LOCK_FILE] else contextlib.nullcontext():
-        view = memory.view()
+        events = Ledger(root).events()
     ctx.check_deadline()
-    return view
+    return events
 
 
 def _ledger_info(view: View) -> dict[str, Any]:
@@ -1183,4 +1187,5 @@ def register(registry: Registry) -> None:
         registry.add(tool)
 
 
-__all__ = ["FIND_FINDINGS", "GET_FINDING", "VERIFY_CLAIM", "open_view", "register", "summary"]
+__all__ = ["FIND_FINDINGS", "GET_FINDING", "LEDGER_NOTE", "VERIFY_CLAIM", "open_events",
+           "open_view", "register", "summary"]

@@ -2,10 +2,15 @@
 
 All notable changes to this project are recorded here. Versions follow PEP 440.
 
-## [Unreleased]
+## [0.11.0] - 2026-10-07 - Readable digests, agent contract r2, semantic gate passed
 
 ### Measured
 
+- Fourth live run of the semantic gate (2026-10-07, set revision 2, agent contract r2, haiku,
+  USD 1.10): **passed** (precision 30/30, coverage 30/31, abstention 9/9, false abstentions
+  1/31, 48/48 intact citations, no errors). One run; earlier runs varied. The abstention
+  development set (26 items) scored 26/26 under both contracts; r2 cut abstain turns from 233
+  to 81 and the cost from USD 1.37 to USD 0.68 (`eval/dev-run-2026-10-07-contract-r*.txt`).
 - Third live run of the semantic gate (2026-10-07, set revision 2, haiku, USD 1.39):
   precision 31/32 = 0.969 and coverage 31/31 pass, abstention 7/9 and one turn-limit error
   fail, so the gate still fails (`eval/live-run-2026-10-07.txt`,
@@ -13,6 +18,32 @@ All notable changes to this project are recorded here. Versions follow PEP 440.
 
 ### Added
 
+- **Answer-or-abstain rules R1-R4** (`docs/agents/README.md`): a request-time value (a
+  model's score, probability, prediction, rank or feed position for a viewer, account or
+  post; reach; an experiment assignment; the live or production state of a parameter,
+  switch, decider or metric) is not in the code, and explaining the mechanism is not an
+  answer; a suppression or boost claim needs a span implementing exactly that rule; stop
+  searching after two unproductive searches in a row or eight in all (searches that lead to
+  a cited span do not count); an abstention states its scope. Stated in the MCP server
+  instructions, `AGENTS-snippet.md`, `AGENTS.md`/`CLAUDE.md` and the live harness (contract
+  `r2`, the new default; `--contract r1` keeps the 2026-10-07 contract verbatim, and
+  `--server-src DIR` runs the server from another `src` tree for before/after runs). The
+  `search_code` description says that zero hits is not evidence of absence.
+- **MCP tool `stale_worklist`** (`timelinexray/mcp/tools/stale.py`): the stale-review
+  worklist of the configured ledger, the same data as `txray findings stale --json`, read
+  only through the guarded, chain-verified ledger read of the findings tools (no event, no
+  lock file, no draft file). Inputs `target`, `area`, `limit` (1-20, default 5), `cursor`;
+  bounded per entry (10 citations, 5 occurrences, 10 dependencies, 20 read commands) and
+  per batch step (50 ids); commands carry no `--store`/`--ledger`. Thirteen tools; the
+  published output-schema budget went from 2,200 to 2,100 bytes per tool so `tools/list`
+  stays under the 40,000-byte test limit (about 39.9 KB; only `manifest_summary` lost
+  depth). A `Tool` may set its own `output_budget`.
+- **Abstention development set** `eval/dev-abstain.json` (`"purpose": "development"`): 14
+  new abstain items (per-request outputs, live configuration, moderation claims) and 12
+  answerable controls; never the release gate (the gate files are byte-unchanged and
+  pinned by a test). `run_gate.py` checks it (78 / 78); `live_gate.py` reports it with
+  per-family results, turns and `abstentions_with_scope`, without a gate verdict. No live
+  run was made; the commands and expected costs are in docs/release-checklist.md.
 - **`txray findings stale [--target C] [--limit N] [--spec-dir DIR] [--json]`**
   (`timelinexray/findings/stale.py`): a read-only, prioritised re-review list of every
   active finding that is not `CURRENT` at the target (default: the newest pin). Each entry
@@ -63,6 +94,12 @@ All notable changes to this project are recorded here. Versions follow PEP 440.
 
 ### Changed
 
+- `txray findings stale` prints its suggested commands without `--store`/`--ledger`:
+  when the paths are the defaults (or set through `TXRAY_STORE`/`TXRAY_FINDINGS`) they work
+  as printed, otherwise one `env  export TXRAY_STORE=... TXRAY_FINDINGS=...` line precedes
+  them. `--json` keeps the options as given and adds `shell.export`. The one-line hints of
+  `findings reanchor`, `findings verify` and `update --reanchor` leave out a default
+  `--store`/`--ledger`.
 - **`txray update --reanchor`** prints the first ten new review items in the worklist
   order (then `... and N more`; `update-status.json` lists all of them), a `review` line
   with the exact `txray findings stale` command and an `unpinned` line with `txray findings
@@ -115,6 +152,42 @@ All notable changes to this project are recorded here. Versions follow PEP 440.
   left another class are import-only hunks (17 from `scoring-logic`, 46 from
   `model-config`) and build manifests such as `Cargo.toml` that were `model-config` by
   extension. On `aaa167b..77d431a`: `unknown` 1,522 -> 1,381.
+- **Change classifier version 3: the `scoring-logic` name rule, hand-checked and tightened**
+  (`timelinexray/diff/rules.py` `is_scoring_name`, `name_words`; `engine.py`
+  `_rule_symbols`; tests `ScoringNameRuleTest`). A seeded hand check of 85 `scoring-logic`
+  items (seed 20261007, stratified by path/symbol rule over `77d431a..78460ca` and
+  `aaa167b..77d431a`, every hunk read) found version 2 precision of 11/27, 4/13, 5/25 and
+  3/20 correct (recent path, recent symbol, full path, full symbol). Version 3 matches whole
+  words split at punctuation and camelCase (no `rankall`, `UNSCORED`, `lightweight`),
+  excludes names containing PageRank or RankAll, reads only symbols that enclose a changed
+  line (a pure insertion no longer takes the name of the declaration at its anchor line) and
+  ignores test symbols for production lines. All 21 sampled items that left the class were
+  wrong; none correct moved. Kept precision: 11/22, 4/8, 5/16, 3/18. On `77d431a..78460ca`:
+  `scoring-logic` 65 -> 53 items (19 hunks to `unknown`, 4 to `model-config`); on
+  `aaa167b..77d431a`: 228 -> 176. `findings stale` reads the same rule for its scoring area.
+- **Classifier version 3: four content classes** (what the changed lines do; new module
+  `timelinexray/diff/content.py`, `analysis.py`, `engine.py`; tests `ContentRulesTest` with
+  what each rule must not take, and four new files in the shared class fixture):
+  - `access-modifier`: tokens equal once Rust `pub(...)` or Java/Scala `public`/`private`/
+    `protected` modifiers are removed (decided before the name rules);
+  - `observability`: every changed code line belongs to a statement that only logs, traces
+    or records a metric (statements split on masked code; Rust, Python, Java, Scala); only
+    call shapes of logging and metrics libraries count, never the words `metric` or `stats`,
+    which name ranking data in this upstream;
+  - `data-type`: every changed code line lies inside a Rust `struct`/`enum`/`union`
+    definition and contains no `=`;
+  - `visibility-rule`: every changed code line lies inside a Rust `const`/`static` or
+    function whose declared or return type is built only from `Condition`, `Predicate`,
+    `Clause`, `RuleClause`.
+  The last three apply only when no name rule matched. Seeded hand checks (seed 20261007):
+  `observability` 11/11 (all items), `access-modifier` 11/11 (all items), `visibility-rule`
+  20/20 (20 of 32), `data-type` 25/26 for a first version and 22/22 after excluding lines with
+  `=` (a clap `Args` struct carried command-line defaults in attributes). Measured on
+  `77d431a..78460ca`: `unknown` 469 -> 404 of 1,236 items (classifier v2 -> v3, including the
+  19 hunks the tightened scoring rule returned); main digest 39,988 -> 38,940 bytes. On
+  `aaa167b..77d431a`: `unknown` 1,381 -> 1,422 (whole added files; 49 hunks back from
+  `scoring-logic`). New classes are counted by area in the main digest and listed in the
+  appendix and JSON with both citations.
 
 ## [0.10.0] - 2026-10-02 - One-command install
 

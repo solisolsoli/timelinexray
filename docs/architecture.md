@@ -50,7 +50,8 @@ with the others.
    malformed MCP requests, analytics canary egress); documented limits
    ([limits.md](limits.md)); the digest's affected findings read from the ledger; the
    anchor rule refined (`FOUND_MULTIPLE` confirms a span; uniqueness only for relocation);
-   strict and published MCP output schemas (`tools/list` at about 34 KB); public internal
+   strict and published MCP output schemas (`tools/list` at about 34 KB then, 39.9 KB with
+   thirteen tools); public internal
    APIs instead of cross-package private helpers; CI readiness (workflow, `make ci`,
    `scripts/`); clean-install walk ([release-checklist.md](release-checklist.md)).
 
@@ -75,10 +76,11 @@ question set, a model-free check in `make ci` and a live harness run by hand; se
 
 **Stale review (unreleased).** `findings/stale.py` turns the recorded re-anchoring checks
 into a prioritised re-review list (`txray findings stale`, the `reanchor` summary and the
-`update --reanchor` report): the old span, the span located or aligned at the target, the
-exact commands and optional successor drafts. It only reads the ledger and the pins; review,
+`update --reanchor` report, and read-only over MCP as `stale_worklist`): the old span, the
+span located or aligned at the target, the exact commands and optional successor drafts. It only reads the ledger and the pins; review,
 supersession and retraction stay with the findings service and a named actor. The set
-revisions of the gate are separate files in `eval/` (`questions.json` is revision 1).
+revisions of the gate are separate files in `eval/` (`questions.json` is revision 1); the
+abstention development set `eval/dev-abstain.json` is never the gate.
 
 **Setup command.** `txray setup` (`setup_cli.py`) composes existing guarded operations and
 adds no network code: `SnapshotStore.pin` (fetches through `netguard.fetch` only when the

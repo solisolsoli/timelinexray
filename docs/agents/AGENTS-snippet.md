@@ -14,8 +14,23 @@
   pinned commit (pinned commits only, nothing fetched).
 - The repository holds code and public defaults only: no production or live values, no
   per-viewer or per-account data or experiment assignments, no trained model weights, no
-  reach predictions. Abstain on a question that needs them; if two targeted searches find
-  no supporting span, abstain and state the search scope instead of searching on.
+  reach predictions. Answer or abstain by these rules (details: TimelineXray
+  `docs/agents/README.md`):
+  - R1 Request-time values are not in the code: a model's score, probability, prediction,
+    rank or feed position for a viewer, account or post, an engagement count or reach, an
+    experiment assignment, and the live, current or production state of a parameter,
+    feature switch, decider or metric exist only when a request is served. Abstain on a
+    question that asks for one; explaining the mechanism is not an answer.
+  - R2 Rules need a span that states them: a claim that an account or behaviour is
+    suppressed, demoted, shadowbanned, throttled, penalised or boosted needs a read span
+    that implements exactly that rule; a related weight, a filter on another condition, a
+    similar name or zero hits supports neither yes nor no.
+  - R3 Search budget: count the searches that find no span directly stating the asked
+    fact; after two such searches in a row, or eight in all, stop searching and answer only
+    with what read spans support, otherwise abstain (searches that lead to a cited span, and
+    reading spans, do not count).
+  - R4 An abstention states its scope: the commit, the searches run and whether their
+    coverage was complete.
 - A matching hash is text identity, not proof that a claim is true. Give every claim one
   evidence status (`SUPPORTED`, `PARTIAL`, `NOT_FOUND`, `CONTRADICTED`,
   `EXTERNAL_RECHECK`) and one evidence class; do not mark your own claims `SUPPORTED`.

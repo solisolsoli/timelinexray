@@ -21,10 +21,14 @@ Classification of one changed file (first matching rule wins for the whole file)
    * each remaining hunk: ``cosmetic`` when the comment- and whitespace-insensitive
      tokens of both sides are equal; ``test-only`` inside test code; ``license`` when every
      changed line is license header text; ``build-dependency`` when every changed code line
-     is an import or bodyless module declaration; else ``scoring-logic``,
-     ``model-config`` or ``unknown`` from path and symbol names
-     (:func:`timelinexray.diff.rules.logic_class`). An ``unknown`` item records why in
-     ``detail.unknown_reason``.
+     is an import or bodyless module declaration; ``access-modifier`` when the tokens are
+     equal once access modifiers are removed; else ``scoring-logic`` or ``model-config``
+     from path and symbol names (:func:`timelinexray.diff.rules.logic_match`, reading only
+     symbols that enclose a changed production line); else a content class
+     (:mod:`timelinexray.diff.content`): ``observability`` (only log, trace or metric
+     statements), ``data-type`` (only Rust type-definition lines that assign no value),
+     ``visibility-rule`` (only lines of visibility rule declarations); else ``unknown``,
+     which records why in ``detail.unknown_reason``.
 
 Adjacent hunks of the same class inside the same symbol form one item. Every item cites an
 exact span on each side, read with :func:`timelinexray.span.read_span` from the blob bytes.
@@ -43,6 +47,7 @@ from typing import Any
 from ..errors import IntegrityError
 from ..snapshot.manifest import Manifest, ManifestEntry
 from ..snapshot.store import PinRecord, SnapshotStore
+from . import content
 from .analysis import PARAM_MACRO, BlobAnalysis, BlobView, RegList, ValueDecl, make_analysis
 from .hunks import align_hunks, line_hunks
 from .model import (
@@ -58,16 +63,20 @@ from .model import (
     Hunk,
 )
 from .rules import (
+    ACCESS_MODIFIER,
     BUILD_DEPENDENCY,
     CLASSIFIER_VERSION,
     COSMETIC,
+    DATA_TYPE,
     GENERATED_VENDORED,
     LICENSE,
     NATIVE_LANGUAGES,
+    OBSERVABILITY,
     PARAMETER_DEFAULT,
     REGISTRATION,
     TEST_ONLY,
     UNKNOWN,
+    VISIBILITY_RULE,
     class_rank,
     is_key_value_config,
     logic_match,
@@ -680,11 +689,15 @@ class _FileContext:
                 cls = LICENSE
             elif self._declarations_only(old_a, old_lines, new_a, new_lines):
                 cls = BUILD_DEPENDENCY
+            elif _modifiers_only(old_a, rest_old, new_a, rest_new):
+                cls = ACCESS_MODIFIER
             else:
-                names = self._attribute("old", [hunk]) + self._attribute("new", [hunk])
+                names = _rule_symbols(old_a, old_lines) + _rule_symbols(new_a, new_lines)
                 cls, rule, matched = logic_match(self.paths, names)
                 if rule is not None and matched is not None:
                     match = (rule, matched)
+                elif cls == UNKNOWN:
+                    cls = _content_class(old_a, old_lines, new_a, new_lines) or UNKNOWN
             regions.append((cls, hunk, self._group_symbol(hunk), match))
         builders: list[_Builder] = []
         group: list[Hunk] = []
@@ -783,6 +796,52 @@ class _FileContext:
         return _Builder(cls, "region", summary,
                         self.side_citation("old", hunks), self.side_citation("new", hunks),
                         detail, old_symbols, new_symbols, hunks=list(hunks))
+
+
+def _modifiers_only(old_a: BlobAnalysis | None, old_lines: list[int],
+                    new_a: BlobAnalysis | None, new_lines: list[int]) -> bool:
+    """Both sides have changed lines in one parsed language whose tokens are equal once
+    access modifiers are removed (:func:`content.without_access_modifiers`); the caller has
+    already ruled out equal tokens (``cosmetic``)."""
+    if not old_lines or not new_lines or old_a is None or new_a is None:
+        return False
+    if old_a.masked is None or old_a.language != new_a.language:
+        return False
+    old_tokens = content.without_access_modifiers(old_a.tokens(old_lines), old_a.language or "")
+    new_tokens = content.without_access_modifiers(new_a.tokens(new_lines), new_a.language or "")
+    return old_tokens is not None and old_tokens == new_tokens
+
+
+def _content_class(old_a: BlobAnalysis | None, old_lines: list[int],
+                   new_a: BlobAnalysis | None, new_lines: list[int]) -> str | None:
+    """A content class for a hunk no name rule took: ``observability`` when every changed
+    code line on both sides is a telemetry line, ``data-type`` when every one lies inside a
+    Rust type definition, ``visibility-rule`` when every one lies inside a visibility rule
+    declaration (:mod:`timelinexray.diff.content`)."""
+    for cls, attribute in ((OBSERVABILITY, "telemetry_lines"), (DATA_TYPE, "type_body_lines"),
+                           (VISIBILITY_RULE, "rule_declaration_lines")):
+        verdicts: list[bool | None] = []
+        for analysis, lines in ((old_a, old_lines), (new_a, new_lines)):
+            if not lines:
+                continue
+            verdicts.append(None if analysis is None
+                            else analysis.only_within(lines, getattr(analysis, attribute)))
+            if analysis is None:
+                verdicts.append(False)
+        if False not in verdicts and True in verdicts:
+            return cls
+    return None
+
+
+def _rule_symbols(analysis: BlobAnalysis | None, lines: list[int]) -> tuple[str, ...]:
+    """Names a symbol rule may read for one side of a hunk: the symbols enclosing its changed
+    lines outside test code. A side without changed lines gives none (its anchor line belongs
+    to a neighbouring declaration), and a test function's name never decides the class of a
+    production line."""
+    if analysis is None:
+        return ()
+    production = [line for line in lines if not analysis.in_test_ranges([line])]
+    return analysis.attribute(production) if production else ()
 
 
 def _same_tokens(old_a: BlobAnalysis | None, old_lines: list[int],

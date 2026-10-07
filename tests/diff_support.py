@@ -237,6 +237,10 @@ CLASSES_OLD: dict[str, bytes] = {
     "visibility/rules.rs": b"pub fn hide(flags: u8) -> bool {\n    flags > 2\n}\n",
     "svc/BUILD.bazel": b'rust_library(name = "svc", deps = [":a"])\n',
     "svc/wiring.rs": b"use crate::a::Alpha;\n\npub fn wire() -> u8 {\n    1\n}\n",
+    "svc/shapes.rs": b"pub struct Shape {\n    pub side: u8,\n}\n",
+    "svc/logging.rs": b'pub fn serve(x: u8) -> u8 {\n    info!("serving");\n    x\n}\n',
+    "svc/rules.rs": b"const LOGGED_OUT: Condition = viewer(ViewerPredicate::LoggedOut);\n",
+    "svc/access.rs": b"fn helper() -> u8 {\n    1\n}\n",
 }
 
 CLASSES_NEW: dict[str, bytes] = {
@@ -260,6 +264,10 @@ CLASSES_NEW: dict[str, bytes] = {
     "visibility/rules.rs": b"pub fn hide(flags: u8) -> bool {\n    flags > 3\n}\n",
     "svc/BUILD.bazel": b'rust_library(name = "svc", deps = [":a", ":b"])\n',
     "svc/wiring.rs": b"use crate::a::{Alpha, Beta};\n// wiring\n\npub fn wire() -> u8 {\n    1\n}\n",
+    "svc/shapes.rs": b"pub struct Shape {\n    pub side: u8,\n    pub sides: u8,\n}\n",
+    "svc/logging.rs": b'pub fn serve(x: u8) -> u8 {\n    info!("serving x={}", x);\n    x\n}\n',
+    "svc/rules.rs": b"const LOGGED_OUT: Condition = not(viewer(ViewerPredicate::LoggedIn));\n",
+    "svc/access.rs": b"pub(crate) fn helper() -> u8 {\n    1\n}\n",
 }
 
 

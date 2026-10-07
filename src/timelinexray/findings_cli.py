@@ -46,7 +46,7 @@ from .findings import (
 )
 from .findings.freshness import READINGS, PinIndex, describe, evaluate, is_current
 from .findings.model import EVIDENCE_CLASSES, ROLES, SCOPES
-from .findings.stale import Worklist, unpinned_commits, worklist, worktree_of
+from .findings.stale import Worklist, locations, unpinned_commits, worklist, worktree_of
 from .fsutil import atomic_write, check_output_directory
 from .netguard import DEFAULT_UPSTREAM_URL, Allowlist
 from .snapshot.store import default_store_root
@@ -161,15 +161,26 @@ def _counts(counter: dict[str, int]) -> str:
     return ", ".join(f"{key} {value}" for key, value in sorted(counter.items())) or "none"
 
 
-def _location_args(args: argparse.Namespace) -> tuple[list[str], list[str]]:
-    """The ``--store`` and ``--ledger`` options of this run, for printed commands."""
+def _given_location_args(args: argparse.Namespace) -> tuple[list[str], list[str]]:
+    """The ``--store`` and ``--ledger`` options exactly as given (``--json`` commands)."""
     store = ["--store", str(args.store)] if args.store else []
     ledger = ["--ledger", str(args.ledger)] if getattr(args, "ledger", None) else []
     return store, ledger
 
 
-def _worklist(args: argparse.Namespace, memory: FindingsMemory, target: str | None) -> Worklist:
-    store, ledger = _location_args(args)
+def _location_args(args: argparse.Namespace) -> tuple[list[str], list[str]]:
+    """The options a printed command needs: ``--json`` keeps them as given; text output
+    leaves out a ``--store`` or ``--ledger`` that names the directory the default resolution
+    finds anyway (``$TXRAY_STORE`` / ``$TXRAY_FINDINGS`` or the defaults)."""
+    if getattr(args, "json", False):
+        return _given_location_args(args)
+    where = locations(args.store, getattr(args, "ledger", None))
+    return where.store_args, where.ledger_args
+
+
+def _worklist(args: argparse.Namespace, memory: FindingsMemory, target: str | None, *,
+              short: bool = False) -> Worklist:
+    store, ledger = ([], []) if short else _location_args(args)
     return worklist(memory, target, store_args=store, ledger_args=ledger)
 
 
@@ -400,12 +411,21 @@ def _write_drafts(args: argparse.Namespace, memory: FindingsMemory, work: Workli
 
 def _cmd_stale(args: argparse.Namespace) -> int:
     memory = _memory(args)
-    work = _worklist(args, memory, args.target)
+    where = locations(args.store, args.ledger)
+    # text: short commands (plus one export line when a location is not the default);
+    # --json: every command with the options exactly as given
+    work = _worklist(args, memory, args.target, short=not args.json)
     limit = None if args.limit == 0 else args.limit
     shown = work.entries if limit is None else work.entries[:limit]
     written = _write_drafts(args, memory, work, work.entries) if args.spec_dir else []
     data = work.to_dict(limit=None if args.json else limit)
     data["drafts_written"] = written
+    data["shell"] = {"export": where.export_line,
+                     "note": ("text output prints the commands without --store/--ledger; "
+                              "they reach this store and ledger as they are"
+                              if where.export_line is None else
+                              "text output prints the commands without --store/--ledger; "
+                              "run the export line first")}
     if args.json:
         _emit(args, data)
         return 0
@@ -414,6 +434,8 @@ def _cmd_stale(args: argparse.Namespace) -> int:
     lines = [f"stale review  target {work.target[:12]}"
              + ("  (newest pin)" if newest == work.target else "")
              + f"  ledger head {work.view.head[:16]}",
+             *([f"env           {where.export_line}   (run this first: the commands below "
+                "omit --store/--ledger)"] if where.export_line else []),
              f"not current   {counts['not_current']} to re-review of {counts['checkable']} "
              f"checkable finding(s); freshness {_counts(counts['freshness'])}; areas "
              f"{_counts(counts['by_area'])}",

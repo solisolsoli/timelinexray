@@ -5,8 +5,9 @@ Two files, both pure functions of the JSON document (same document, same bytes):
 * :func:`render_markdown`, the **main digest**: a summary first (what changed, what to
   check next), then the statements, the range, events, the summary by class, parameter
   defaults, registrations, affected findings and the ``scoring-logic``
-  items with their citations; every other class (model-config, test-only,
-  build-dependency, cosmetic, docs, license, generated, unknown) is counted by area. Every
+  items with their citations; every other class (visibility-rule, model-config, test-only,
+  build-dependency, data-type, observability, access-modifier, cosmetic, docs, license,
+  generated, unknown) is counted by area. Every
   section has a row budget; what does not fit is said, with its count, and is in the
   appendix. The main file is bounded on any range.
 * :func:`render_appendix`: every classified item that the main file does not list, grouped

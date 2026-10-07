@@ -35,6 +35,7 @@ from .digest import (
 from .digest.build import digest_summary
 from .digest.update import FAILED, NO_CHANGE, run_update
 from .findings import ledger_directory
+from .findings.stale import locations
 from .fsutil import check_output_directory
 from .index import CodeIndex
 from .netguard import DEFAULT_UPSTREAM_URL, ENV_ALLOW_FILE_URLS, Allowlist
@@ -176,8 +177,9 @@ def _stale_lines(args: argparse.Namespace, refresh: Any) -> list[str]:
     if not summary:
         return []
     counts = summary["counts"]
-    where = [*(["--store", str(args.store)] if args.store else []),
-             *(["--ledger", str(args.ledger)] if args.ledger else [])]
+    # only the options a fresh shell needs: a --store/--ledger naming the default is left out
+    located = locations(args.store, args.ledger)
+    where = [*located.store_args, *located.ledger_args]
     lines = []
     if counts["not_current"]:
         areas = ", ".join(f"{k} {v}" for k, v in counts["by_area"].items())

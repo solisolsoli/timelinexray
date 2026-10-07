@@ -23,7 +23,7 @@ from timelinexray.mcp.tools import build_registry
 from tests.mcp_support import (
     CODE_TOOLS,
     EXPECTED_TOOLS,
-    FINDINGS_TOOLS,
+    LEDGER_TOOLS,
     LEGACY,
     MODERN,
     SNAPSHOT,
@@ -109,8 +109,9 @@ class FixtureStdioTest(unittest.TestCase):
         # without a findings ledger (<store>/findings does not exist) the findings tools
         # answer NOT_FOUND and the server keeps serving
         findings_calls = {"find_findings": {}, "get_finding": {"finding_id": "F-000000000000"},
-                          "verify_claim": {"finding_id": "F-000000000000"}}
-        self.assertEqual(list(findings_calls), FINDINGS_TOOLS)
+                          "verify_claim": {"finding_id": "F-000000000000"},
+                          "stale_worklist": {}}
+        self.assertEqual(list(findings_calls), LEDGER_TOOLS)
         for number, (name, arguments) in enumerate(findings_calls.items(), 20):
             with self.subTest(tool=name):
                 response = client.ask(call(name, arguments, id=number, modern=False))

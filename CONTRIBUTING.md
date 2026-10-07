@@ -1,6 +1,6 @@
 # Contributing
 
-TimelineXray is a public alpha (0.10.0). Contributor and agent rules (evidence
+TimelineXray is a public alpha (0.11.0). Contributor and agent rules (evidence
 contract, hard boundaries, commit identity, no remote and no push without separate
 approval) are in [AGENTS.md](AGENTS.md); read it first. The threat model is in
 [SECURITY.md](SECURITY.md) and the known limits in [docs/limits.md](docs/limits.md). Everyone taking part follows the

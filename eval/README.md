@@ -43,7 +43,7 @@ file's SHA-256).
 | Revision | File | Status | Live runs |
 | --- | --- | --- | --- |
 | 1 | `questions.json` | root-reviewed 2026-10-01 | 2026-10-01 and 2026-10-02 (`live-run-2026-10-0*.txt`), both below the precision threshold |
-| 2 | `questions-v2.json` | root-reviewed 2026-10-07 | 2026-10-07 (`live-run-2026-10-07.txt`): precision 0.969 passes, abstention 7/9 fails |
+| 2 | `questions-v2.json` | root-reviewed 2026-10-07 | 2026-10-07 contract r1 (`live-run-2026-10-07.txt`): abstention 7/9, fails; 2026-10-07 contract r2 (`live-run-2026-10-07-contract-r2.txt`): **passes** |
 
 A revision file carries a top-level `revision` record: its number, date, the base revision
 (file, number, SHA-256, status), the thresholds (unchanged) and one change per item with the
@@ -62,6 +62,34 @@ conditions (both from the root analysis of the second live run); by reading, Q02
 longer require an order their questions do not ask for, identifier patterns (Q01, Q03, Q20,
 Q21) accept a space or hyphen, Q25, Q27 and Q29 accept a thousands separator, and the negative
 weights (Q15-Q19) accept an en dash or "negative". The reasons are in the file.
+
+## Abstention development set (not the gate)
+
+`dev-abstain.json` (`"purpose": "development"`) is a separate, clearly labelled set for
+developing the agent contract's abstention rules (R1-R4, `docs/agents/README.md`) without
+touching or tuning against the gate sets above, which stay byte-identical (their SHA-256 is
+pinned by `tests/test_agent_contract.py`). It was written on 2026-10-07 before any live run.
+
+- 14 abstain items with new wording in three families: `per-request` (a model score,
+  probability, dwell or feed position for one viewer and post, reach of one account),
+  `live-config` (the production state of a feature switch or decider, a live threshold,
+  yesterday's metrics, the cluster that serves most users) and `moderation` (shadowban or
+  penalty claims the code does not state). Each has probes that must return zero hits.
+- 12 answerable controls next to those families (`control-*`): yes/no moderation questions
+  the code does answer (a filter that drops muted or blocked authors; one that keeps every
+  in-network post; a "no" backed by `unwrap_or(false)`), public defaults next to the
+  "production value" questions, and per-request mechanisms (the holdout bucket's inputs).
+  They were written by reading the code at `77d431a`; no research finding is behind them,
+  so `source` is `null` (allowed only in a development set). A contract that abstains on
+  everything loses these.
+- `run_gate.py --questions eval/dev-abstain.json` checks its citations and probes exactly
+  like the gate's (78 checks); `tests/test_agent_contract.py` does so in `make ci`.
+- `live_gate.py --questions eval/dev-abstain.json` runs and scores it like the gate, adds
+  per-family results, turns per kind and `abstentions_with_scope` (rule R4), and prints no
+  gate verdict. `--contract r1 --server-src <src of 0c4df26>` reproduces the contract of the
+  2026-10-07 run (prompt, reply schema, server instructions and tool descriptions) for a
+  before/after comparison; the commands and expected costs are in
+  `docs/release-checklist.md`, section 3a, "Abstention development set".
 
 ## Deterministic harness (part of `make ci`)
 
@@ -92,7 +120,10 @@ python eval/live_gate.py --store "$STORE" --out "$OUT" --questions eval/question
     --model haiku --budget-usd 3.00
 ```
 
-Pass `--questions` explicitly so the report names the revision that was run.
+Pass `--questions` explicitly so the report names the revision that was run. `--contract`
+(`r2`, the default, with rules R1-R4; `r1`, the contract of the 2026-10-02 and 2026-10-07
+runs) is recorded in the report; the reply schema of `r2` adds `searched` (the queries an
+abstention ran), which is reported and never scored.
 
 Each item becomes one `claude -p` call: `--strict-mcp-config` with a generated
 configuration for `txray mcp serve` on the store, `--tools ""` (no built-in tools),
