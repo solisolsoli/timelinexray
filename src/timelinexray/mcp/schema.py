@@ -23,13 +23,15 @@ JSON integers (not ``1.0``) and never booleans; ``number`` never accepts boolean
 Published output schemas
 ------------------------
 :func:`published_output` turns a tool's strict output schema into the lean schema listed by
-``tools/list``: descriptions are dropped, the envelope and the ``data`` object stay exact
-(closed, every member required, all constraints), and deeper levels keep only their shape
-(member names, JSON types, ``enum`` and ``const``) down to the deepest level that fits a
-per-tool byte budget; below that only the JSON type is given. Repeated shapes become
-``$defs`` entries. Every published schema is therefore a relaxation of the strict one: a
-value valid under the strict schema is valid under the published one. The server validates
-every tool result against the strict schema before it is sent.
+``tools/list``: descriptions and value bounds (lengths, counts, patterns) are dropped below
+the root; the envelope stays closed and lists every member with its type, ``enum`` or
+``const`` (its ``required`` list and the inner structure of ``error`` are left to the strict
+schema); the ``data`` object stays closed with every member required; deeper levels keep
+only their shape (member names, JSON types, ``enum`` and ``const``) down to the deepest
+level that fits a per-tool byte budget; below that only the JSON type is given. Repeated
+shapes become ``$defs`` entries. Every published schema is therefore a relaxation of the
+strict one: a value valid under the strict schema is valid under the published one. The
+server validates every tool result against the strict schema before it is sent.
 """
 
 from __future__ import annotations
@@ -230,10 +232,11 @@ def check_schema(schema: Any, where: str = "", root: Mapping[str, Any] | None = 
 #: ``content_trust`` value of every citation: the cited bytes are upstream data.
 UNTRUSTED = "UNTRUSTED_SOURCE_DATA"
 
+#: A full commit id (resolve_commit's description says that it expands a prefix; the id
+#: pattern says the rest, so the field carries no description of its own).
 COMMIT_FULL = {
     "type": "string",
     "pattern": "^[0-9a-f]{40}$",
-    "description": "Full 40-digit commit id of a pinned commit (use resolve_commit for a prefix).",
 }
 SHA256 = {"type": "string", "pattern": "^[0-9a-f]{64}$"}
 OID = {"type": "string", "pattern": "^[0-9a-f]{40}$|^[0-9a-f]{64}$"}
@@ -285,8 +288,13 @@ def counts(max_items: int = 64) -> dict[str, Any]:
 #: Keywords kept below the exact levels: the shape of a value, not its constraints.
 _SHAPE = frozenset({"type", "enum", "const", "properties", "items", "additionalProperties",
                     "anyOf", "$ref"})
+#: Value bounds: lengths, counts, ranges and patterns. The published schema keeps them only
+#: at the root; the members of the envelope keep their structure (types, enums, consts,
+#: required members, closed objects) and the strict schema keeps every bound.
+_BOUNDS = frozenset({"pattern", "minLength", "maxLength", "minimum", "maximum", "minItems",
+                     "maxItems"})
 #: Byte budget of one published output schema (compact JSON), see :func:`published_output`.
-OUTPUT_SCHEMA_BUDGET = 2100
+OUTPUT_SCHEMA_BUDGET = 1800
 _FACTOR_MIN_BYTES = 60
 
 
@@ -302,14 +310,17 @@ def _kinds(schema: Mapping[str, Any]) -> list[str]:
 
 
 def project(schema: Mapping[str, Any], *, exact_depth: int, shape_depth: int,
-            depth: int = 0) -> dict[str, Any]:
+            bounds_depth: int | None = None, depth: int = 0) -> dict[str, Any]:
     """A relaxation of ``schema``: exact above ``exact_depth``, shape only below it.
 
     ``depth`` counts object levels from the root (the envelope is 0, its members 1, the
     members of ``data`` 2, ...). Objects and arrays at ``shape_depth`` or deeper keep only
-    their JSON type. Annotations are dropped everywhere. Every value valid under ``schema``
-    is valid under the result.
+    their JSON type. From ``bounds_depth`` on (default: ``exact_depth``) value bounds
+    (lengths, counts, ranges, patterns) are dropped even where the structure is exact.
+    Annotations are dropped everywhere. Every value valid under ``schema`` is valid under
+    the result.
     """
+    bounds_depth = exact_depth if bounds_depth is None else bounds_depth
     kinds = _kinds(schema)
     if depth >= shape_depth and ("object" in kinds or "array" in kinds):
         return {"type": schema["type"]}
@@ -319,20 +330,23 @@ def project(schema: Mapping[str, Any], *, exact_depth: int, shape_depth: int,
             continue
         if depth >= exact_depth and key not in _SHAPE:
             continue
+        if depth >= bounds_depth and key in _BOUNDS:
+            continue
         if key == "additionalProperties" and value is False and depth >= exact_depth:
             continue
         if key == "properties":
             out[key] = {name: project(sub, exact_depth=exact_depth, shape_depth=shape_depth,
-                                      depth=depth + 1) for name, sub in value.items()}
+                                      bounds_depth=bounds_depth, depth=depth + 1)
+                        for name, sub in value.items()}
         elif key == "items":
             out[key] = project(value, exact_depth=exact_depth, shape_depth=shape_depth,
-                               depth=depth)
+                               bounds_depth=bounds_depth, depth=depth)
         elif key == "additionalProperties" and isinstance(value, Mapping):
             out[key] = project(value, exact_depth=exact_depth, shape_depth=shape_depth,
-                               depth=depth + 1)
+                               bounds_depth=bounds_depth, depth=depth + 1)
         elif key == "anyOf":
             out[key] = [project(sub, exact_depth=exact_depth, shape_depth=shape_depth,
-                                depth=depth) for sub in value]
+                                bounds_depth=bounds_depth, depth=depth) for sub in value]
         else:
             out[key] = value
     return out
@@ -409,15 +423,16 @@ def published_output(strict: Mapping[str, Any], *,
                      budget: int = OUTPUT_SCHEMA_BUDGET) -> dict[str, Any]:
     """The lean output schema ``tools/list`` publishes for the strict ``strict``.
 
-    The envelope (depth 0) and its members, including the ``data`` object (depth 1), stay
-    exact; members of ``data`` and below keep their shape. The shape is kept to the deepest
+    The envelope (depth 0) and its members, including the ``data`` object (depth 1), keep
+    their structure (see :func:`published_projection`); members of ``data`` and below keep
+    their shape. The shape is kept to the deepest
     level whose factored projection fits ``budget`` bytes, and always at least to the
     members of ``data`` (their names, types and enums); deeper objects and arrays give only
     their type.
     """
     best: dict[str, Any] | None = None
     for shape_depth in range(2, 12):
-        candidate = factor(project(strict, exact_depth=2, shape_depth=shape_depth))
+        candidate = published_projection(strict, shape_depth)
         if best is not None and len(_compact(candidate)) > budget:
             break
         best = candidate
@@ -426,3 +441,27 @@ def published_output(strict: Mapping[str, Any], *,
             break
     assert best is not None
     return best
+
+
+def published_projection(strict: Mapping[str, Any], shape_depth: int) -> dict[str, Any]:
+    """The published form of ``strict`` with shape kept down to ``shape_depth``: projected
+    (value bounds dropped below the root), factored, and with the lean envelope."""
+    return _lean_envelope(factor(project(strict, exact_depth=2, shape_depth=shape_depth,
+                                         bounds_depth=1)))
+
+
+def _lean_envelope(schema: dict[str, Any]) -> dict[str, Any]:
+    """The envelope as published: closed, every member with its type, ``enum`` or ``const``;
+    the root's ``required`` list and the inner structure of members other than ``data``
+    (``error``: closed, ``code`` and ``message`` required) are left to the strict schema,
+    which the server enforces (every envelope member is always present)."""
+    out = {key: value for key, value in schema.items() if key != "required"}
+    members = {}
+    for name, member in schema.get("properties", {}).items():
+        if name != "data" and isinstance(member, dict):
+            member = {key: value for key, value in member.items()
+                      if key not in ("required", "additionalProperties")}
+        members[name] = member
+    if "properties" in schema:
+        out["properties"] = members
+    return out

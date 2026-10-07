@@ -14,7 +14,7 @@ import re
 
 from ..snapshot.classify import license_kind
 
-CLASSIFIER_VERSION = 3
+CLASSIFIER_VERSION = 4
 
 PARAMETER_DEFAULT = "parameter-default"
 REGISTRATION = "registration"
@@ -77,28 +77,33 @@ CLASS_EVIDENCE = {
     "scorers, side effects, rules, ...) were added, removed or reordered",
     SCORING_LOGIC: "changed code whose path, or else the production symbol enclosing a "
     "changed line, has a word naming scoring, weights or ranking (score, weight, rank, boost, "
-    "decay, blend, ...; not PageRank or RankAll): a name heuristic, not a semantic analysis; "
-    "in a hand check 15 of 30 recent and 8 of 34 full-history items were scoring code "
-    "(docs/updates.md)",
+    "decay, blend, ...; not PageRank or RankAll, not a metrics, stats or debug name, not "
+    "kernel or training code, not a hunk that only logs or only adds type fields): a name "
+    "heuristic, not a semantic analysis; in a hand check 9 of 19 recent and 2 of 13 "
+    "full-history items were scoring code (docs/updates.md)",
     VISIBILITY_RULE: "every changed code line lies inside a Rust const or function whose declared "
     "or return type is built only from the visibility rule types Condition, Predicate, Clause "
     "and RuleClause (a declared-type rule, Milestone 2 symbols), and no name rule matched",
     MODEL_CONFIG: "changed code or configuration in a model, feature, config, schema, proto, "
-    "thrift, inference, train or training location (a path heuristic)",
+    "thrift, inference, train, training or optimizers location, or GPU kernel code (cuda, "
+    "cutedsl, pallas, triton, kernels directories; .cu/.cuh files): a path heuristic",
     LICENSE: "a license or notice file, or license header lines, changed",
     DOCS_ONLY: "only documentation files changed",
     TEST_ONLY: "only test files or test regions changed (a path and file-name heuristic, "
-    "plus test symbols such as #[cfg(test)] modules)",
+    "plus test symbols such as #[cfg(test)] modules and items; blank and comment lines may "
+    "accompany them)",
     BUILD_DEPENDENCY: "a build or dependency manifest changed (a file-name heuristic: BUILD, "
     "*.bazel, Cargo.toml, build.rs, requirements*.txt, Makefile, ...), or every changed code "
     "line is an import, use, extern crate, bodyless mod or package declaration (Milestone 2 "
-    "symbols)",
+    "symbols; an empty __init__.py is a package marker, py.typed a build file)",
     DATA_TYPE: "every changed code line lies inside a Rust struct, enum or union definition "
     "(fields, variants, their attributes; Milestone 2 symbols) and assigns no value (no '=': "
-    "no discriminant, no attribute default), and no name rule matched",
+    "no discriminant, no attribute default), and no name rule matched other than a scoring "
+    "path (a type whose own name is a scoring name stays scoring-logic)",
     OBSERVABILITY: "every changed code line belongs to a statement that only logs, traces or "
     "records a metric (Rust log/tracing/metrics macros and Prometheus counters, Python logger "
-    "and metrics calls, Java/Scala log and stats calls; masked code), and no name rule matched",
+    "and metrics calls, Java/Scala log and stats calls; masked code), and no model/config "
+    "path rule matched (it wins over the scoring-name rule)",
     ACCESS_MODIFIER: "the comment- and whitespace-insensitive tokens of both sides are equal once "
     "access modifiers are removed (Rust pub, pub(crate), pub(super), pub(in path); Java public, "
     "private, protected; Scala private/protected[scope])",
@@ -167,12 +172,24 @@ _SCORING_WORD = re.compile(
 #: contains one of them is not a scoring name, whatever else it contains (hand check,
 #: classifier version 3, docs/updates.md).
 _NOT_SCORING_PHRASES = (("page", "rank"), ("pagerank",), ("rank", "all"), ("rankall",))
+#: Words that name telemetry or debugging. A path whose file name, or a symbol whose last
+#: component, has one of them is not a scoring name for the classifier (``SCORED_METRIC``,
+#: ``get_debug_scored_posts``, ``scored_stats_side_effect.rs``; classifier version 4).
+_TELEMETRY_WORDS = frozenset({"metric", "metrics", "stat", "stats", "statistics", "debug"})
 _NAME_CHUNK = re.compile(r"[A-Za-z0-9]+")
 _NAME_WORD = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+")
 _MODEL_CONFIG_DIRS = re.compile(
     r"(?i)^(models?|features?|configs?|conf|settings|schemas?|protos?|thrift|embeddings?|"
     r"checkpoints?|inference|train|training)$"
 )
+#: Model-side locations: GPU kernel code of a model (CUDA, CuTe DSL, Pallas, Triton) and
+#: offline training code (train, training, optimizers). A changed line there is model code,
+#: whatever its name says (``ranker_attention.py`` is an attention kernel of the ranker model),
+#: so this path rule is read before the scoring-name rules (classifier version 4).
+_MODEL_SIDE_DIRS = re.compile(
+    r"(?i)^(cuda|cutedsl|pallas|triton|kernels|train|training|optimizers)$"
+)
+_MODEL_SIDE_EXTENSIONS = frozenset({".cu", ".cuh"})
 _MODEL_CONFIG_NAMES = re.compile(r"(?i)(config|feature|model|schema|embedding)")
 _CONFIG_EXTENSIONS = frozenset(
     {".cfg", ".conf", ".ini", ".json", ".properties", ".proto", ".thrift", ".toml", ".yaml", ".yml"}
@@ -194,6 +211,7 @@ _BUILD_NAMES = _BUILD_MANIFESTS | frozenset(
         "dockerfile", "containerfile", "pom.xml", "build.gradle", "build.gradle.kts",
         "settings.gradle", "settings.gradle.kts", "build.sbt", "go.mod", "go.sum",
         "package-lock.json", "yarn.lock", "pnpm-lock.yaml", ".python-version", ".nvmrc",
+        "py.typed",
     }
 )
 _BUILD_EXTENSIONS = frozenset({".bazel", ".bzl", ".cmake", ".gradle", ".mk"})
@@ -261,7 +279,44 @@ def is_scoring_name(text: str | None) -> bool:
     return any(_SCORING_WORD.fullmatch(word) for word in words)
 
 
+def is_telemetry_name(text: str | None, *, path: bool) -> bool:
+    """Whether the file name of a path (``path=True``, extension removed) or the last
+    component of a symbol name (after the final ``::`` or ``.``) has a telemetry or debugging
+    word (:data:`_TELEMETRY_WORDS`)."""
+    if not text:
+        return False
+    if path:
+        tail = posixpath.splitext(posixpath.basename(text))[0]
+    else:
+        tail = re.split(r"::|\.", text)[-1]
+    return bool(_TELEMETRY_WORDS.intersection(name_words(tail)))
+
+
+def is_scoring_path(path: str | None) -> bool:
+    """The classifier's scoring path rule: :func:`is_scoring_name` and no telemetry word in
+    the file name (:func:`is_telemetry_name`)."""
+    return is_scoring_name(path) and not is_telemetry_name(path, path=True)
+
+
+def is_scoring_symbol(name: str | None) -> bool:
+    """The classifier's scoring symbol rule: :func:`is_scoring_name` and no telemetry word in
+    the last name component (:func:`is_telemetry_name`)."""
+    return is_scoring_name(name) and not is_telemetry_name(name, path=False)
+
+
+def is_model_side_path(path: str) -> bool:
+    """GPU kernel or offline training code of a model, by location: a directory named
+    ``cuda``, ``cutedsl``, ``pallas``, ``triton``, ``kernels``, ``train``, ``training`` or
+    ``optimizers``, or a CUDA source file (``.cu``, ``.cuh``)."""
+    parts = _segments(path)
+    if any(_MODEL_SIDE_DIRS.match(part) for part in parts[:-1]):
+        return True
+    return posixpath.splitext(parts[-1])[1].lower() in _MODEL_SIDE_EXTENSIONS
+
+
 def is_model_config_path(path: str) -> bool:
+    if is_model_side_path(path):
+        return True
     parts = _segments(path)
     if any(_MODEL_CONFIG_DIRS.match(part) for part in parts[:-1]):
         return True
@@ -303,16 +358,28 @@ def logic_match(paths: tuple[str, ...],
     """Class of a changed region that is neither a parameter, registration nor cosmetic,
     with the rule that decided it: ``(class, "path" | "symbol" | None, matched name)``.
 
-    Order: a scoring-related path, a model/config path, a scoring-related enclosing symbol
-    name, else unknown (:func:`is_scoring_name`; the caller passes only symbols that enclose a
-    changed production line). (A filtering/visibility name rule was tried for classifier version 2
+    Order: a model-side path (:func:`is_model_side_path`: kernel or training code), a
+    scoring-related path (:func:`is_scoring_path`), a model/config path, a scoring-related
+    enclosing symbol name (:func:`is_scoring_symbol`), else unknown (the caller passes only
+    symbols that enclose a changed production line). (A filtering/visibility name rule was tried for classifier version 2
     and rejected: in a hand check most of its items were caches, telemetry and tooling, so
     such changes stay ``unknown``; see ``docs/updates.md``.)
     """
+    # Telemetry names are read only when every enclosing symbol was read: a longer list ends
+    # with "... N more", and the unread symbols may name scoring code. When every enclosing
+    # symbol has a telemetry name (SCORE_METRICS_SAMPLE_RATE), a scoring path does not decide.
+    complete = not any(name.startswith("... ") for name in symbol_names)
+    telemetry_only = complete and bool(symbol_names) and all(
+        is_telemetry_name(name, path=False) for name in symbol_names)
+
+    def scoring_path(path: str) -> bool:
+        return not telemetry_only and is_scoring_path(path)
+
     checks = (
-        (SCORING_LOGIC, "path", paths, is_scoring_name),
+        (MODEL_CONFIG, "path", paths, is_model_side_path),
+        (SCORING_LOGIC, "path", paths, scoring_path),
         (MODEL_CONFIG, "path", paths, is_model_config_path),
-        (SCORING_LOGIC, "symbol", symbol_names, is_scoring_name),
+        (SCORING_LOGIC, "symbol", symbol_names, is_scoring_symbol if complete else is_scoring_name),
     )
     for cls, rule, names, test in checks:
         for name in names:

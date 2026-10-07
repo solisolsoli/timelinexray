@@ -110,18 +110,31 @@ local `$defs`/`$ref`). Each tool has two output schemas (Milestone 6):
   replaced by an `ERROR` envelope with code `invalid_output` (fail closed). The test suite
   validates every result it sees against both schemas;
 - the **published** `outputSchema` in `tools/list`: a relaxation of the strict one
-  (`schema.published_output`). The envelope and the `data` object are exact (closed, every
-  member required, all constraints); below that only the shape is kept (member names, JSON
-  types, `enum`, `const`), as deep as fits a budget of 2,100 bytes per tool and always at
-  least the members of `data`; deeper objects and arrays give only their type;
-  descriptions are dropped; repeated shapes become `$defs` entries. Any value valid under
-  the strict schema is valid under the published one.
+  (`schema.published_output`). The envelope is closed and lists every member with its JSON
+  type, `enum` (`outcome`) or `const` (`schema_version`, `tool`); the `data` object is closed
+  with every member required; below that only the shape is kept (member names, JSON types,
+  `enum`, `const`), as deep as fits a budget of 1,800 published bytes per tool and always at
+  least the members of `data`; deeper objects and arrays give only their type. Value bounds
+  (lengths, counts, patterns), descriptions, the envelope's `required` list and the inner
+  `required`/closed structure of `error` are only in the strict schema (every envelope
+  member is always present); repeated shapes become `$defs` entries. Any value valid under
+  the strict schema is valid under the published one. Tool definitions carry no `$schema`
+  (JSON Schema 2020-12 is the MCP default dialect) and no `annotations.title` (the
+  top-level `title` is the display name).
 
-This keeps the whole `tools/list` response at about 39.9 KB of the 64 KiB line with thirteen
-tools (38.0 KB with twelve tools and a 2,200-byte budget; about 34.3 KB with ten tools and a
-2,600-byte budget; about 61.8 KB with the full schemas). The budget went from 2,200 to 2,100
-bytes with `stale_worklist`; of the existing tools only `manifest_summary` lost depth (its
-`pin`, `counts` and `licenses` members are published as plain objects and arrays). The published list is pinned by
+This keeps the whole `tools/list` response at about 33.1 KB (modern) and 32.9 KB (legacy)
+of the 64 KiB line with thirteen tools: 39.9 KB before the lean envelope and the tightened
+descriptions (0.11.0, a 2,100-byte budget, where `manifest_summary` had lost depth), 38.0 KB
+with twelve tools and a 2,200-byte budget, about 34.3 KB with ten tools and a 2,600-byte
+budget, about 61.8 KB with the full schemas. Measured (`tools/list` line, modern, bytes):
+envelope bounds dropped 39,779 -> 39,160 (two tools then went deeper), budget 2,000 and
+tightened descriptions, no `$schema` or `annotations.title` 36,486, envelope `required`
+lists and the commit field's repeated description left to the strict schema 33,094; the
+budget is 1,800 published bytes since then, which keeps every tool at its 0.11.0 depth and
+gives `manifest_summary` back its `pin`, `counts` and `licenses` member shapes. Every
+statement an agent relies on stays in the descriptions (pinned by
+`tests/test_mcp.py::SchemaReferenceTest::test_tools_list_keeps_the_contract_statements`).
+The published list is pinned by
 `tests/mcp_tools_list.json`; a contract change must regenerate it deliberately:
 `PYTHONPATH=src python3 -m timelinexray mcp tools --json > tests/mcp_tools_list.json`.
 
@@ -164,7 +177,7 @@ only when the pin's upstream is the allowlisted GitHub URL; for `file://` mirror
 | `find_findings` | 20 findings per page, 20 citations per finding, 16 query terms | `total` counts every match; findings left out by `current_only` are counted in `not_current`. |
 | `get_finding` | 20 citations, dependencies, checks, reviews and queue items; 10 provenance revisions; 100 history events (newest first) | Marked with `TRUNCATED:` warnings; `history` is the list the server shortens to fit the response line. |
 | `verify_claim` | 8 given citations; 20 results listed (the freshness covers all) | The time budget covers every blob read. |
-| `tools/list` | about 39.9 KB of the 64 KiB response line with thirteen tools (38.0 KB with twelve; 34.3 KB with ten; 61.8 KB before Milestone 6) | A test fails at 40,000 bytes (`tests/test_mcp_findings.py`); `stale_worklist`'s definition must stay under 2,400 bytes (`tests/test_mcp_stale.py`). |
+| `tools/list` | about 33.1 KB of the 64 KiB response line with thirteen tools (39.9 KB in 0.11.0; 61.8 KB before Milestone 6) | A test fails at 34,000 bytes (`tests/test_mcp_findings.py`); `stale_worklist`'s definition must stay under 2,400 bytes (`tests/test_mcp_stale.py`). |
 | `stale_worklist` | 20 entries per page (default 5); per entry 10 citations, 5 occurrences, 10 dependencies, 20 read commands; 50 finding ids per batch step; titles 300 and reasons 1,000 characters | `citations_total` and `findings_total` give the full counts. |
 
 Cursors are `base64url(payload).hmac`: the payload binds tool, commit, index generation, a

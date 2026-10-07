@@ -59,6 +59,7 @@ UNKNOWN_REASONS = {
     "and token rules could apply",
     "not-text": "not compared as text (binary, oversize, symlink or submodule)",
     "mode-only": "only the file mode changed",
+    "empty-file": "an empty file was added or removed",
 }
 
 

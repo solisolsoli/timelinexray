@@ -64,7 +64,9 @@ link at a digest's name is replaced, never followed.
 ## Classes
 
 A class names what the rule saw; it is not a reviewed interpretation. One file can yield
-items of several classes. Rules, in order (classifier version 3; version 2 had no content
+items of several classes. Rules, in order (classifier version 4; version 3 let every
+scoring name win over kernel and training locations, metrics and debug names and the
+content classes, version 2 had no content
 rules, matched scoring names as substrings and read neighbouring and test symbols, version 1
 had no
 `build-dependency`, no `train` location or test helper names, and its `unknown` items
@@ -76,18 +78,19 @@ carried no reason):
 | `license` | a license or notice file (`LICENSE*`, `NOTICE*`, `COPYING*`, ...), or a hunk whose every changed line is license header text | a determination of the applicable license |
 | `generated-vendored` | the manifest says `generated` or `vendored` | reviewed upstream code |
 | `docs-only` | documentation files (`.md`, `.rst`, `.txt`, `docs/`, `README*`, ...) | a change of behaviour |
-| `test-only` | test files (`tests/`, `golden_corpus/`, `*_test.rs`, `test_*.py`, `*Test.java`, `test_support.*`, `test_helpers.*`, `*_fixtures.*`, ...), or hunks entirely inside test code (Rust `#[cfg(test)]` modules and `#[test]` functions, Java `@Test` methods, Python `test_*`/`Test*`) | a change of production code |
-| `build-dependency` | a build-system or dependency file by name (`BUILD`, `*.bazel`, `*.bzl`, `WORKSPACE`, `Cargo.toml`, `build.rs`, `pyproject.toml`, `setup.py`, `requirements*.txt`, `package.json`, `Makefile`, `CMakeLists.txt`, `Dockerfile`, `pom.xml`, `build.gradle`, `build.sbt`, `go.mod`, ...), or a hunk whose every changed code line lies in a Milestone 2 `import` symbol (Rust `use`/`extern crate`, Java, Scala and Python imports) or a bodyless `module` symbol (`mod name;`, a `package` clause); blank and comment-only lines may accompany them | that behaviour is unchanged: an import can change name resolution and a dependency version can change behaviour |
+| `test-only` | test files (`tests/`, `golden_corpus/`, `*_test.rs`, `test_*.py`, `*Test.java`, `test_support.*`, `test_helpers.*`, `*_fixtures.*`, ...), or hunks whose code lines all lie inside test code (Rust `#[cfg(test)]` modules and items and `#[test]` functions, Java `@Test` methods, Python `test_*`/`Test*`) | a change of production code |
+| `build-dependency` | a build-system or dependency file by name (`BUILD`, `*.bazel`, `*.bzl`, `WORKSPACE`, `Cargo.toml`, `build.rs`, `pyproject.toml`, `setup.py`, `requirements*.txt`, `package.json`, `Makefile`, `CMakeLists.txt`, `Dockerfile`, `pom.xml`, `build.gradle`, `build.sbt`, `go.mod`, ...), or a hunk whose every changed code line lies in a Milestone 2 `import` symbol (Rust `use`/`extern crate`, Java, Scala and Python imports) or a bodyless `module` symbol (`mod name;`, a `package` clause); blank and comment-only lines may accompany them; an added or removed empty `__init__.py` (a package marker) and `py.typed` | that behaviour is unchanged: an import can change name resolution and a dependency version can change behaviour |
 | `parameter-default` | the value of a `param!(Name, type, "flag", value)` declaration, a `const`/`static` or Java `static final` with a literal value, a literal Java/Scala field, a Python `UPPER_CASE` constant with a literal value, or a key of a YAML/TOML/INI/JSON config file differs between the two cited declarations; `param!` declarations added or removed | a production value: every value is a **public default** at its commit |
 | `registration` | entries of a list that registers components were added, removed or reordered, or such a list appeared or disappeared: a `vec![...]`, `Seq(...)`, `List.of(...)` or Python list whose entries name components (`...Filter`, `...Source`, `...Hydrator`, `...Scorer`, `...SideEffect`, `...Rule`, ...) or that is bound to a name like `filters`, `sources`, `side_effects`, `rules` | that a registered component is active for any request |
 | `cosmetic` | the comment- and whitespace-insensitive tokens of both sides are equal (string literals kept whole; indentation kept for Python and YAML), or a file moved with identical content | semantic equivalence where parser coverage is incomplete |
 | `access-modifier` | a hunk with changed lines on both sides whose tokens are equal once access modifiers are removed (Rust `pub`, `pub(crate)`, `pub(super)`, `pub(in path)`; Java `public`, `private`, `protected`; Scala `private`/`protected` with an optional `[scope]`); decided before the name rules, since no other token changed | that behaviour is unchanged: a newly visible item can be used from other modules |
-| `scoring-logic` | other changed code whose path, or else a symbol enclosing a changed production line, has a whole word naming scoring, weights or ranking (`score`/`scorer`/`scoring`/`scored`, `weight`, `rank`/`ranker`/`ranking`, `rerank`, `rescore`, `boost`, `penalty`, `decay`, `diversity`, `blend`/`blender`, `multiplier`, `calibrate`/`calibration`; words split at punctuation and camelCase), unless the name contains PageRank or RankAll | that the change alters any ranking outcome; in the hand check below about half of the recent items, and fewer over the full history, were scoring code |
+| `model-config` (model side) | changed code under a GPU kernel or offline training location: a `cuda`, `cutedsl`, `pallas`, `triton`, `kernels`, `train`, `training` or `optimizers` directory, or a `.cu`/`.cuh` file; read before the scoring-name rule (`ranker_attention.py` there is an attention kernel of the ranker model) | that a model artifact was deployed |
+| `scoring-logic` | other changed code whose path, or else a symbol enclosing a changed production line, has a whole word naming scoring, weights or ranking (`score`/`scorer`/`scoring`/`scored`, `weight`, `rank`/`ranker`/`ranking`, `rerank`, `rescore`, `boost`, `penalty`, `decay`, `diversity`, `blend`/`blender`, `multiplier`, `calibrate`/`calibration`; words split at punctuation and camelCase), unless the name contains PageRank or RankAll, or a telemetry word (`metric(s)`, `stat(s)`, `statistics`, `debug`) is in the path's file name or the symbol's last component (`SCORED_METRIC`, `get_debug_scored_posts`, `scored_stats_side_effect.rs`; read only when the hunk's enclosing symbols are all listed, at most eight; when every enclosing symbol has a telemetry name the path does not decide either); a hunk that is `observability`, or `data-type` with the scoring word in the path alone, takes that class instead | that the change alters any ranking outcome; in the hand check below about half of the recent items, and fewer over the full history, were scoring code |
 | `model-config` | other changed code or configuration under a model, feature, config, schema, proto, thrift, inference, `train` or training location | that a model artifact was deployed |
-| `observability` | (only when no name rule matched) every changed code line of the hunk belongs to a statement that only logs, traces or records a metric: Rust `trace!`..`error!` and `tracing::`/`log::` macros, `event!`, `metrics`-crate macros, Prometheus `register_*!` statics, `NAME.inc()`/`observe()` and `NAME.with_label_values(..).set()`; Python `logger.`/`logging.`/`log.` calls and `Metrics.counter|histogram|gauge|timer(...)` with an optional `.record()`/`.add()`; Java and Scala `log.`/`logger.` calls and `stats.counter(...).incr()`. Only these call shapes count: the words `metric` or `stats` alone never do, since in this upstream they often name ranking data (`Metric`, `metric_value`, a `stats` map). Statements are split on masked code (no string or comment can fake one), a line shared with any other statement or a block header does not count | that behaviour is unchanged: a logged expression can have side effects and a metric can drive alerts or experiments |
-| `data-type` | (only when no name rule matched) every changed code line lies inside a Rust `struct`, `enum` or `union` definition (Milestone 2 symbols; fields, variants, attributes) and contains no `=` (no discriminant, no attribute default such as `default_value_t = 8080`) | that behaviour is unchanged: a new field or variant changes what code stores, matches and serializes |
+| `observability` | (when no name rule matched, or instead of `scoring-logic`) every changed code line of the hunk belongs to a statement that only logs, traces or records a metric: Rust `trace!`..`error!` and `tracing::`/`log::` macros, `event!`, `metrics`-crate macros, Prometheus `register_*!` statics, `NAME.inc()`/`observe()` and `NAME.with_label_values(..).set()`; Python `logger.`/`logging.`/`log.` calls and `Metrics.counter|histogram|gauge|timer(...)` with an optional `.record()`/`.add()`; Java and Scala `log.`/`logger.` calls and `stats.counter(...).incr()`. Only these call shapes count: the words `metric` or `stats` alone never do, since in this upstream they often name ranking data (`Metric`, `metric_value`, a `stats` map). Statements are split on masked code (no string or comment can fake one), a line shared with any other statement or a block header does not count | that behaviour is unchanged: a logged expression can have side effects and a metric can drive alerts or experiments |
+| `data-type` | (when no name rule matched, or instead of a scoring *path*, when no enclosing symbol is a scoring name: a `pacing` field of `RequestShape` in `vm_ranker_request.rs`; a field of `ValueModelWeights` stays `scoring-logic`) every changed code line lies inside a Rust `struct`, `enum` or `union` definition (Milestone 2 symbols; fields, variants, attributes) and contains no `=` (no discriminant, no attribute default such as `default_value_t = 8080`) | that behaviour is unchanged: a new field or variant changes what code stores, matches and serializes |
 | `visibility-rule` | (only when no name rule matched) every changed code line lies inside a Rust `const`/`static` whose declared type, or a function whose return type, is built only from the visibility rule types `Condition`, `Predicate`, `Clause`, `RuleClause` (`Vec<RuleClause>`, `[Clause; 3]`, `&[Condition]`) | that any post's visibility changed: the definition may be a refactor, and whether a rule runs depends on its registration and safety level |
-| `unknown` | everything else; each item says why (`detail.unknown_reason`): `no-rule` (a parsed language, and no rule matched), `not-parsed` (a language without symbol extraction, such as C, C++, CUDA or shell: only path and token rules could apply), `not-text`, `mode-only` | anything: it needs review |
+| `unknown` | everything else; each item says why (`detail.unknown_reason`): `no-rule` (a parsed language, and no rule matched), `not-parsed` (a language without symbol extraction, such as C, C++, CUDA or shell: only path and token rules could apply), `not-text`, `mode-only`, `empty-file` (an empty file added or removed) | anything: it needs review |
 
 Every `scoring-logic` and `model-config` item records the rule that decided it in
 `detail.matched_by` (`path` or `symbol`, and the matched name). New rules are kept only after
@@ -122,6 +125,63 @@ ranker model (`ranker_fa4/`, `pallas/ranker_attention*`), telemetry and debug co
 `ranked_following` pipeline. Read `scoring-logic` as "worth a look", never as "changes
 scoring". Every moved item went to `unknown` or, under a config/proto/thrift location, to
 `model-config`.
+
+Version 4 (hand check `random.Random(20261008).sample` over the version 3 `scoring-logic`
+items sorted by id, 22 of 53 items of `77d431a..78460ca` and 22 of 176 of `aaa167b..77d431a`;
+every hunk read at both commits; same verdicts as above) makes the precise classes win over
+the scoring name where the hunk is clearly one of them: kernel and training locations
+(model side, above), telemetry and debug names, an `observability` hunk, and a `data-type`
+hunk whose scoring word came from the path alone. Precision, correct / adjacent / wrong:
+recent 9/6/7 (strict 0.41, lenient 0.68) -> 9/6/4 on the 19 items that stay (0.47, 0.79);
+full history 2/6/14 (0.09, 0.36) -> 2/6/5 on 13 (0.15, 0.62). All 12 sampled items that
+moved were wrong; no correct or adjacent sampled item moved. Every item that moved in either
+range was checked (47: 40 kernel or optimizer files, 3 of them recent; metric registrations,
+metric-name constants, a debug endpoint, a stats filter, the metrics module of `vm-ranker`, a
+metric sampling-rate constant, and one adjacent `RequestShape` field, now `data-type`): 19
+read in full, the other 28, all whole files under `cutedsl/ranker_fa4/`, `pallas/` or
+`optimizers/`, by path and symbol list. The telemetry words are read only when every enclosing symbol of the hunk is
+listed: a whole added file with more than eight symbols keeps its scoring name, since its
+unread symbols may hold scoring code (two SimClusters candidate sources that compute
+candidate scores would otherwise have moved). A scan of every identifier of the upstream at
+`77d431a` and `78460ca` (62,158) found 34 that carry both a scoring and a telemetry word; all
+are metrics, statistics, debug endpoints, test helpers or training statistics. What still
+reads wrong: module declarations and client builders in `mod.rs`, Kafka topic settings,
+old-side symbols of rewritten servers, a reputation score (`UserCredV2`), storage readers in
+a `scorer`-named file. The same model-side rule took 56 items out of `unknown` (17 recent, 39
+full history: CUDA kernels and host bindings under `phoenix/xrex/cuda/`, their Python
+wrappers, optimizers); a seeded sample of 20 (seed 20261008) was 20 correct.
+Counts: `scoring-logic` 53 -> 45 (recent), 176 -> 137 (full history).
+
+What `unknown` is made of (version 4, after the model-side rule): on `77d431a..78460ca`, 384
+of 1,236 items; 318 regions of modified files, 28 of renamed files, 38 whole added or removed
+files; Rust 322, Python 59, Strato 3; areas `visibility-filtering/hydration` 87,
+`phoenix/xrex` 54, `visibility-filtering/staging` 33, `abuse-enforcement-service` 28, then a
+long tail. A text heuristic over the 346 regions of modified or renamed files put 300 in
+"other logic" and the rest in small groups (constant declarations 17, signature-only edits
+16, Python annotations 7, test-named symbols 6). On `aaa167b..77d431a`, 1,352 of 2,698: 1,211
+are whole added or removed files (Scala 360, Rust 312, Python 230, Java 198; BotMaker rule
+files `.df`/`.bot` 69, Strato 26), the initial publication of subsystems such as `botmaker`,
+`simclusters`, `grox`. A whole added file takes a class only when the whole file fits one:
+its path class where that class is precise (license, generated/vendored, documentation,
+tests, build files, as before), or a content class for all its lines; production code of a
+new subsystem stays `unknown`, and that is honest. Version 4 adds three small rules, each
+read in full (populations below 20 were read item by item): a Rust item marked
+`#[cfg(test)]` (any item, not only modules; not `cfg(any(test, ...))` or `cfg(not(test))`)
+is test code, and blank or comment-only lines may accompany test code (9 items moved to
+`test-only`, 9 correct: `#[cfg(test)] mod ..._tests` blocks whose attribute or the blank line
+before them sat outside the module's span, `#[cfg(test)]` helper functions); an added or
+removed empty file is no longer reported as a mode change: an empty `__init__.py` is a
+package marker (`build-dependency`, 19 items) and `py.typed` is a build file by name (10
+items), any other empty file stays `unknown` with reason `empty-file`; a binary or symlink
+under a precise path class takes it (1 item: a symlinked test resource). Tried and **not
+kept**: files named `metrics.rs`/`metrics.py` as `observability` (24 items read, 20 correct:
+two Python files compute evaluation metrics and two Rust items carry a hydration timeout
+helper, so the name is not enough); constants with literal values added or removed in
+modified files as `parameter-default` (11 items, below a meaningful check); a class for
+BotMaker rule files (`.bot`, `.df`, 69 items, full history only) is left to a design
+decision, since such a class would describe moderation rules. Result: `unknown` 404 -> 384
+(33 % -> 31 %) on `77d431a..78460ca` and 1,422 -> 1,352 on `aaa167b..77d431a`, counting the
+model-side rule.
 
 The four content rules of version 3 say what the changed lines *do* and were each kept only
 after a seeded hand check (`random.Random(20261007).sample` over the rule's items sorted by
@@ -375,6 +435,10 @@ reported, not promised.
 | `aaa167b..77d431a`, classifier v2 | 2,689 net items, unknown 1,381 (v1: 1,522 of 2,684); main digest 68,360 bytes with every row budget reached and the cut rows named, appendix 1,145,053 |
 | `77d431a..78460ca`, classifier v3 | 1,236 net items: parameter-default 25, registration 7, scoring-logic 53, visibility-rule 32, model-config 163, docs-only 1, test-only 248, build-dependency 125, data-type 37, observability 5, access-modifier 11, cosmetic 124, generated-vendored 1, unknown 404 (no-rule 392, not-parsed 12). Main digest 38,940 bytes, appendix 434,543, JSON 2,306,169 |
 | `aaa167b..77d431a`, classifier v3 | 2,698 net items: scoring-logic 176, data-type 10, observability 6, unknown 1,422; main digest 70,851 bytes (bounded, cuts named), appendix 1,148,942 |
+| `77d431a..78460ca`, classifier v4 (scoring precedence) | 1,236 net items: scoring-logic 45, model-config 184, data-type 38, observability 6, unknown 389 (no-rule 386, not-parsed 3); other classes as in v3. Main digest 31,820 bytes (v3 in the same store: 33,583) |
+| `aaa167b..77d431a`, classifier v4 (scoring precedence) | 2,698 net items: scoring-logic 137, model-config 527, unknown 1,385; main digest 38,658 bytes (v3 in the same store: 38,543) |
+| `77d431a..78460ca`, classifier v4 (final) | 1,236 net items: parameter-default 25, registration 7, scoring-logic 45, visibility-rule 32, model-config 183, docs-only 1, test-only 254, build-dependency 125, data-type 38, observability 6, access-modifier 11, cosmetic 124, generated-vendored 1, unknown 384 (no-rule 381, not-parsed 3). Main digest 31,820 bytes, appendix 435,783, JSON 2,269,940 |
+| `aaa167b..77d431a`, classifier v4 (final) | 2,698 net items: scoring-logic 137, model-config 527, build-dependency 209, test-only 83, unknown 1,352 (no-rule 1,241, not-parsed 110, not-text 1); main digest 38,577 bytes, appendix 1,066,008 |
 | `4c5cfe8..a707cc2` (1 step, 89 files) | 381 items: parameter-default 8, registration 1, scoring-logic 16, model-config 43, docs-only 1, test-only 121, cosmetic 1, unknown 190. `ClickWeight` public default 0.4 -> 0.3 in `home-mixer/params/param.rs` (L322 -> L329) and `vm-ranker/params.rs` (L18 -> L18), with `ContClickDwellTimeWeight` 0.0 -> 0.4 and `NotInterestedWeight` -43.2 -> -47.52 in both files; about 2 s |
 | `aaa167b..77d431a` (39 commits, 37 first-parent steps, one merge) | 2,164 files (2,090 added), 2,684 net items: parameter-default 210, registration 54, scoring-logic 243, model-config 466, license 4, docs-only 9, test-only 78, cosmetic 92, generated-vendored 6, unknown 1,522; timelines reproduce, for example, `ClickWeight` 0.4 at 47c1bcd -> 0.3 at a707cc2 and the reversion of `EnableAdsBrandSafetyVerdictV2` (false -> true -> false); about 30 s without an index; byte-identical across runs |
 | `4c5cfe8..a707cc2` with a ledger of 478 active findings (588 cited or dependency spans, no index) | affected findings: 48 findings (83 rows); 286 spans skipped (path untouched at both commits), 268 placed, 34 not placeable; about 1.9 s against 1.7 s without a ledger (7.7 s before the spans were indexed by path, the proposals skipped and the blobs read in one git process per commit); the affected rows are byte-identical to the unfiltered run |

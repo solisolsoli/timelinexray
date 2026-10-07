@@ -1,6 +1,6 @@
 """Content rules of the change classifier: what the changed lines *do*, read from masked code.
 
-Two rules (classifier version 3), each a line set computed once per blob:
+Content rules (classifier version 3), each a line set computed once per blob:
 
 * **telemetry lines** - lines that belong only to simple statements that log, trace or record
   a metric: Rust ``info!``/``warn!``/... and ``tracing::``/``log::`` macros, ``metrics``-crate

@@ -65,9 +65,9 @@ LIST_COMMITS = Tool(
     name="list_commits",
     title="List pinned commits",
     description=(
-        "List the upstream commits pinned in the local snapshot store, newest committer time "
-        "first, with manifest hash and whether the code index covers them. Only pinned "
-        "commits can be read; this server never fetches."
+        "Pinned upstream commits of the local snapshot store, newest committer time first, "
+        "with manifest hash and index coverage. Only pinned commits can be read; this server "
+        "never fetches."
     ),
     input_schema=S.obj({}),
     data_schema=S.obj(
@@ -97,8 +97,8 @@ RESOLVE_COMMIT = Tool(
     title="Resolve a pinned commit",
     description=(
         "Resolve a commit id or unique prefix (7-40 lowercase hex digits) to the full id of a "
-        "pinned commit. Branch and tag names are not accepted. Other tools require the full "
-        "40-digit id this returns."
+        "pinned commit; branch and tag names are not accepted. Other tools require this full "
+        "40-digit id."
     ),
     input_schema=S.obj(
         {"commit": {"type": "string", "pattern": "^[0-9a-f]{7,40}$",
@@ -164,10 +164,10 @@ MANIFEST_SUMMARY = Tool(
     name="manifest_summary",
     title="Manifest summary of a pinned commit",
     description=(
-        "Summarise the verified manifest of a pinned commit: every path is accounted for as "
-        "parsed-candidate, text or excluded (with the exclusion reason); counts by class, "
-        "reason and guessed language; classifier settings; license files with keyword hints. "
-        "Retrieve this before substantive research on a commit."
+        "The verified manifest of a pinned commit: every path accounted for as "
+        "parsed-candidate, text or excluded (with the reason); counts by class, reason and "
+        "guessed language; classifier settings; license files with keyword hints. Retrieve "
+        "this before substantive research on a commit."
     ),
     input_schema=S.obj({"commit": S.COMMIT_FULL}),
     data_schema=S.obj(

@@ -51,7 +51,7 @@ with the others.
    ([limits.md](limits.md)); the digest's affected findings read from the ledger; the
    anchor rule refined (`FOUND_MULTIPLE` confirms a span; uniqueness only for relocation);
    strict and published MCP output schemas (`tools/list` at about 34 KB then, 39.9 KB with
-   thirteen tools); public internal
+   thirteen tools, 33.1 KB with the lean envelope); public internal
    APIs instead of cross-package private helpers; CI readiness (workflow, `make ci`,
    `scripts/`); clean-install walk ([release-checklist.md](release-checklist.md)).
 

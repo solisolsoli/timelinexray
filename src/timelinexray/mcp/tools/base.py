@@ -158,9 +158,9 @@ class Tool:
             "name": self.name,
             "title": self.title,
             "description": self.description,
-            "inputSchema": {"$schema": S.DIALECT, **self.input_schema},
+            "inputSchema": self.input_schema,
             "outputSchema": self.strict_output_schema if strict else self.output_schema,
-            "annotations": {"title": self.title, **ANNOTATIONS},
+            "annotations": dict(ANNOTATIONS),
         }
 
 

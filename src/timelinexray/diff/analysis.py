@@ -32,6 +32,9 @@ PARAM_MACRO = "param!"
 CONFIG_KEY = "config-key"
 
 #: Symbol kinds that can enclose a changed line for attribution (imports never do).
+#: A Rust ``#[cfg(test)]`` attribute: the item is compiled only for tests. Not
+#: ``cfg(any(test, ...))`` or ``cfg(not(test))``, which also compile outside tests.
+_CFG_TEST = re.compile(rb"#\[\s*cfg\s*\(\s*test\s*\)\s*\]")
 _ATTRIBUTION_SKIP = frozenset({"import"})
 
 _TOKEN = re.compile(r"[A-Za-z0-9_$]+|\S")
@@ -334,8 +337,10 @@ class BlobAnalysis:
     def _is_test_symbol(self, symbol: SymbolInfo) -> bool:
         if self.language == "rust":
             header = b"".join(self.lines[symbol.start_line - 1 : symbol.name_line])
+            if _CFG_TEST.search(header):
+                return True  # any item compiled only for tests (classifier version 4)
             if symbol.kind == "module":
-                return symbol.name in ("tests", "test") or b"cfg(test)" in header
+                return symbol.name in ("tests", "test")
             if symbol.kind in ("function", "method"):
                 return bool(re.search(rb"#\[\s*(?:[\w:]+::)?(?:test|rstest)\b", header))
             return False
@@ -346,6 +351,14 @@ class BlobAnalysis:
                 symbol.kind == "class" and symbol.name.startswith("Test")
             )
         return False
+
+    def in_test_code(self, lines: list[int]) -> bool | None:
+        """Whether every code line of ``lines`` lies in test code; blank and comment-only
+        lines may accompany them (``None``: no code line)."""
+        code_lines = [line for line in lines if not self.code_free(line)]
+        if not code_lines:
+            return None
+        return self.in_test_ranges(code_lines)
 
     def in_test_ranges(self, lines: list[int]) -> bool:
         return bool(lines) and all(

@@ -2,6 +2,47 @@
 
 All notable changes to this project are recorded here. Versions follow PEP 440.
 
+## [Unreleased]
+
+### Note on the semantic gate
+
+- The MCP tool descriptions and published schemas were tightened after the passing gate run
+  of 0.11.0 (the agent contract rules R1-R4 are unchanged and pinned by a test). The gate
+  result belongs to 0.11.0; the next release needs a new live gate run before it is tagged.
+
+### Changed
+
+- **Classifier v4: precise classes win over the scoring name** (`timelinexray/diff/rules.py`,
+  `engine.py`). Kernel and offline training code (`cuda`, `cutedsl`, `pallas`, `triton`,
+  `kernels`, `train`, `training`, `optimizers` directories; `.cu`/`.cuh` files) is
+  `model-config` before the scoring-name rule; a path whose file name, or a symbol whose last
+  component, has a telemetry word (`metric(s)`, `stat(s)`, `statistics`, `debug`) is not a
+  scoring name (symbols only when all enclosing symbols of the hunk are listed); a hunk that
+  is `observability`, or `data-type` with the scoring word in the path alone, takes that
+  class. Hand check (seed 20261008, 44 items, both ranges): strict precision 0.41 -> 0.47
+  recent, 0.09 -> 0.15 full history (lenient 0.68 -> 0.79, 0.36 -> 0.62); all 12 sampled
+  items that moved were wrong, every one of the 47 moved items was checked. `scoring-logic`
+  53 -> 45 on `77d431a..78460ca`, 176 -> 137 on `aaa167b..77d431a`; the model-side rule also
+  took 56 CUDA and optimizer items out of `unknown` (20 of 20 sampled correct). Item ids
+  change with the classifier version.
+- **Classifier v4, `unknown`**: a Rust item marked `#[cfg(test)]` is test code and blank or
+  comment lines may accompany test code (9 items to `test-only`, all read and correct); an
+  added or removed empty file is no longer reported as a mode change (empty `__init__.py`:
+  `build-dependency`, a package marker; `py.typed` is a build file by name; other empty
+  files: `unknown` with reason `empty-file`); a binary or symlink under a test, docs or build
+  path takes that class. With the model-side rule, `unknown` 404 -> 384 on
+  `77d431a..78460ca` and 1,422 -> 1,352 on `aaa167b..77d431a`; the composition of what
+  remains, and the rules tried and not kept, are in docs/updates.md.
+- **MCP `tools/list` headroom**: 39,779 -> 33,094 bytes (modern line; legacy 39,571 ->
+  32,886), test bound 40,000 -> 34,000. The published envelope keeps every member with its
+  type, `enum` and `const` and stays closed; value bounds, its `required` list and the
+  inner structure of `error` are left to the strict schema the server enforces. Tool
+  descriptions are tighter with every contract statement kept (a new test pins them); no
+  `$schema` (the MCP default dialect) and no duplicate `annotations.title`; the full commit
+  field carries no repeated description. Output budget 2,100 -> 1,800 published bytes:
+  every tool keeps its depth and `manifest_summary` gets back its member shapes.
+  `tests/mcp_tools_list.json` regenerated.
+
 ## [0.11.0] - 2026-10-07 - Readable digests, agent contract r2, semantic gate passed
 
 ### Measured

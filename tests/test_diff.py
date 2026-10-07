@@ -354,7 +354,8 @@ class ClassifierV2Test(unittest.TestCase):
                          [{"rule": "path", "name": "scorers/weighted_scorer.rs"}])
         self.assertNotIn("matched_by", imports.detail)
         for item in _items("unknown"):
-            self.assertIn(item.detail["unknown_reason"], ("no-rule", "not-parsed", "not-text", "mode-only"))
+            self.assertIn(item.detail["unknown_reason"], ("no-rule", "not-parsed", "not-text", "mode-only",
+                                                           "empty-file"))
         self.assertEqual(_items("unknown", "assets/blob.bin")[0].detail["unknown_reason"], "not-text")
         self.assertEqual(_items("unknown", "util/constants.py")[0].detail["unknown_reason"], "no-rule")
 
@@ -460,13 +461,13 @@ class ClassifierV2Test(unittest.TestCase):
                 self.assertFalse(rules.is_test_path(path))
 
     def test_unknown_reasons(self) -> None:
-        old = {"svc/run.rs": b"pub fn run() -> u8 {\n    1\n}\n", "kern/k.cu": b"int k() { return 1; }\n",
+        old = {"svc/run.rs": b"pub fn run() -> u8 {\n    1\n}\n", "native/k.cc": b"int k() { return 1; }\n",
                "tool.sh": b"echo a\n"}
-        new = {"svc/run.rs": b"pub fn run() -> u8 {\n    2\n}\n", "kern/k.cu": b"int k() { return 2; }\n",
+        new = {"svc/run.rs": b"pub fn run() -> u8 {\n    2\n}\n", "native/k.cc": b"int k() { return 2; }\n",
                "tool.sh": b"echo b\n"}
         reasons = {i.path: (i.change_class, i.detail["unknown_reason"]) for i in self._diff(old, new).items}
         self.assertEqual(reasons, {"svc/run.rs": ("unknown", "no-rule"),
-                                   "kern/k.cu": ("unknown", "not-parsed"),
+                                   "native/k.cc": ("unknown", "not-parsed"),
                                    "tool.sh": ("unknown", "not-parsed")})
 
 
@@ -537,6 +538,164 @@ class ScoringNameRuleTest(unittest.TestCase):
         self.assertEqual(test_item.change_class, "test-only")
 
 
+class ScoringPrecedenceTest(unittest.TestCase):
+    """Classifier v4: model-side paths, telemetry names and precise content classes win over
+    the scoring-name rule (hand check in docs/updates.md)."""
+
+    def _diff(self, old: dict[str, bytes], new: dict[str, bytes]):
+        fixture = _Fixture([old, new])
+        self.addCleanup(fixture.cleanup)
+        return DiffEngine(fixture.store).diff(*fixture.commits)
+
+    def _classes(self, cases: dict[str, tuple[bytes, bytes]]) -> dict[str, set[str]]:
+        found: dict[str, set[str]] = {}
+        for item in self._diff({p: c[0] for p, c in cases.items()}, {p: c[1] for p, c in cases.items()}).items:
+            found.setdefault(item.path, set()).add(item.change_class)
+        return found
+
+    def test_model_side_paths(self) -> None:
+        for path in ("phoenix/xrex/cutedsl/ranker_fa4/softmax.py", "phoenix/xrex/pallas/ranker_attention.py",
+                     "phoenix/xrex/cuda/top_k/src/kernel.cc", "lib/kernels/rank.py", "x/triton/score.py",
+                     "phoenix/xrex/train/trainer.py", "bdsm/training/train_head.py",
+                     "phoenix/xrex/optimizers/recsys/muon.py", "native/rank_kernel.cu", "native/k.cuh"):
+            with self.subTest(path):
+                self.assertTrue(rules.is_model_side_path(path))
+                self.assertTrue(rules.is_model_config_path(path))
+        for path in ("home-mixer/scorers/phoenix_scorer.rs", "phoenix/xrex/trainer/run.py",
+                     "svc/cuda_utils.rs", "svc/kernel.rs", "phoenix/xrex/eval/metrics.py",
+                     "phoenix/xrex/models/ranker.py", "native/k.cc"):
+            with self.subTest(path):
+                self.assertFalse(rules.is_model_side_path(path))
+        fn = b"def attend(q):\n    return %s\n"
+        found = self._classes({
+            # kernel and training code keep the model location whatever its name says
+            "xrex/cutedsl/ranker_attention.py": (fn % b"q", fn % b"q * 2"),
+            "xrex/optimizers/decay.py": (fn % b"q", fn % b"q * 2"),
+            # a model/config location that is not model-side still loses to a scoring path
+            "xrex/models/ranker.py": (fn % b"q", fn % b"q * 2"),
+            "scorers/rank.py": (fn % b"q", fn % b"q * 2"),
+        })
+        self.assertEqual(found, {"xrex/cutedsl/ranker_attention.py": {"model-config"},
+                                 "xrex/optimizers/decay.py": {"model-config"},
+                                 "xrex/models/ranker.py": {"scoring-logic"},
+                                 "scorers/rank.py": {"scoring-logic"}})
+
+    def test_telemetry_names(self) -> None:
+        for name, path in (("vm-ranker/metrics.rs", True), ("side_effects/scored_stats_side_effect.rs", True),
+                           ("SCORED_METRIC", False), ("ScoredPostsServer::get_debug_scored_posts", False),
+                           ("Source.rerankingStat", False), ("record_score_metrics", False)):
+            with self.subTest(name):
+                self.assertTrue(rules.is_telemetry_name(name, path=path))
+                self.assertFalse((rules.is_scoring_path if path else rules.is_scoring_symbol)(name))
+        for name, path in (("metrics/scoring/weights.rs", True), ("home-mixer/scorers/value_model.rs", True),
+                           ("Metrics.rescore", False), ("compute_weighted_score", False),
+                           ("statistician_rank", False)):
+            with self.subTest(name):
+                self.assertFalse(rules.is_telemetry_name(name, path=path))
+                self.assertTrue((rules.is_scoring_path if path else rules.is_scoring_symbol)(name))
+        # the PageRank exclusion and the plain name test are unchanged
+        self.assertTrue(rules.is_scoring_name("SCORED_METRIC"))
+
+    def test_telemetry_symbols_decide_only_when_complete(self) -> None:
+        consts = b"".join(b"const SCORE_STAT_%d: u8 = %d;\n" % (n, n) for n in range(10))
+        found = self._classes({
+            # every enclosing symbol is a metric name: neither the scoring path nor the symbol decides
+            "scorers/value.rs": (b"const SCORE_METRICS_RATE: f64 = 0.1;\nfn f() {}\n",
+                                 b"const SCORE_METRICS_RATE: f64 = 0.1;\nconst SCORE_METRICS_SAMPLE: u8 = 1;\nfn f() {}\n"),
+            "svc/served.rs": (b"fn f() {}\n", b"const SCORED_METRIC: &str = \"a\";\nfn f() {}\n"),
+            # one enclosing symbol is not a metric name: the scoring path decides
+            "scorers/mixed.rs": (b"fn f() {}\n", b"const SCORE_METRICS_A: u8 = 1;\nfn bonus() -> u8 {\n    2\n}\nfn f() {}\n"),
+            # more than eight enclosing symbols: the unread ones may name scoring code
+            "svc/many.rs": (b"fn f() {}\n", consts + b"fn f() {}\n"),
+        })
+        self.assertEqual(found, {"scorers/value.rs": {"unknown"}, "svc/served.rs": {"unknown"},
+                                 "scorers/mixed.rs": {"scoring-logic"}, "svc/many.rs": {"scoring-logic"}})
+
+    def test_content_classes_win_over_the_name_rule(self) -> None:
+        fn = b"pub fn rank(x: u8) -> u8 {\n%s    x\n}\n"
+        found = self._classes({
+            # only log and metric statements in a scoring path and a scoring-named function
+            "scorers/a.rs": (fn % b'    info!("a");\n', fn % b'    info!("b");\n    HITS.inc();\n'),
+            # a field added to a struct whose name is not a scoring name, in a scoring path
+            "scorers/b.rs": (b"pub struct RequestShape {\n    a: bool,\n}\n",
+                             b"pub struct RequestShape {\n    a: bool,\n    pacing: bool,\n}\n"),
+            # a field added to a struct named for weights stays scoring-logic
+            "scorers/c.rs": (b"pub struct ValueModelWeights {\n    a: f64,\n}\n",
+                             b"pub struct ValueModelWeights {\n    a: f64,\n    b: f64,\n}\n"),
+            # a log line next to a code line is still the scoring rule's
+            "scorers/d.rs": (fn % b'    info!("a");\n', fn % b'    info!("b");\n    let y = x;\n'),
+        })
+        self.assertEqual(found, {"scorers/a.rs": {"observability"}, "scorers/b.rs": {"data-type"},
+                                 "scorers/c.rs": {"scoring-logic"}, "scorers/d.rs": {"scoring-logic"}})
+
+
+class TestAndEmptyFileRulesTest(unittest.TestCase):
+    """Classifier v4 item 2: Rust items compiled only for tests, blank lines next to test code,
+    empty files and binary files under a test path (hand check in docs/updates.md)."""
+
+    def _diff(self, old: dict[str, bytes], new: dict[str, bytes]):
+        fixture = _Fixture([old, new])
+        self.addCleanup(fixture.cleanup)
+        return DiffEngine(fixture.store).diff(*fixture.commits)
+
+    def _classes(self, old: dict[str, bytes], new: dict[str, bytes]) -> dict[str, set[str]]:
+        found: dict[str, set[str]] = {}
+        for item in self._diff(old, new).items:
+            found.setdefault(item.path, set()).add(item.change_class)
+        return found
+
+    def test_cfg_test_items_are_test_code(self) -> None:
+        head = b"pub struct S;\n\nimpl S {\n"
+        tail = b"    pub fn run(&self) -> u8 {\n        1\n    }\n}\n"
+        helper = b"    #[cfg(test)]\n    pub fn for_tests() -> Self {\n        S\n    }\n\n"
+        def with_body(attr: bytes, body: bytes) -> bytes:
+            return head + attr + b"    pub fn helper() -> u8 {\n        " + body + b"\n    }\n\n" + tail
+        found = self._classes(
+            {"svc/a.rs": head + tail, "svc/b.rs": with_body(b"    #[cfg(test)]\n", b"1"),
+             "svc/c.rs": with_body(b"    #[cfg(any(test, feature = \"x\"))]\n", b"1"),
+             "svc/d.rs": with_body(b"    #[cfg(not(test))]\n", b"1"),
+             "svc/e.rs": with_body(b"    // see #[cfg(test)]\n", b"1")},
+            {"svc/a.rs": head + helper + tail, "svc/b.rs": with_body(b"    #[cfg(test)]\n", b"2"),
+             "svc/c.rs": with_body(b"    #[cfg(any(test, feature = \"x\"))]\n", b"2"),
+             "svc/d.rs": with_body(b"    #[cfg(not(test))]\n", b"2"),
+             "svc/e.rs": with_body(b"    // see #[cfg(test)]\n", b"2")})
+        self.assertEqual(found, {"svc/a.rs": {"test-only"}, "svc/b.rs": {"test-only"},
+                                 "svc/c.rs": {"unknown"}, "svc/d.rs": {"unknown"},
+                                 "svc/e.rs": {"unknown"}})
+
+    def test_blank_lines_may_accompany_test_code(self) -> None:
+        body = b"pub fn run() -> u8 {\n    1\n}\n"
+        module = b"\n#[cfg(test)]\nmod checks {\n    #[test]\n    fn runs() {\n        assert_eq!(super::run(), 1);\n    }\n}\n"
+        found = self._classes({"svc/a.rs": body, "svc/b.rs": body},
+                              {"svc/a.rs": body + module,
+                               # a production line next to the test module is not test code
+                               "svc/b.rs": body + b"\nconst LIMIT: u8 = 2;\n" + module})
+        self.assertEqual(found, {"svc/a.rs": {"test-only"}, "svc/b.rs": {"unknown"}})
+
+    def test_empty_files(self) -> None:
+        items = {item.path: item for item in self._diff(
+            {"keep.rs": b"pub fn k() {}\n"},
+            {"keep.rs": b"pub fn k() {}\n", "pkg/__init__.py": b"", "pkg/py.typed": b"",
+             "pkg/empty.rs": b"", "pkg/sub/__init__.py": b"from .a import b\n__all__ = ['b']\n"}).items}
+        self.assertEqual(items["pkg/__init__.py"].change_class, "build-dependency")
+        self.assertIn("empty file (a Python package marker)", items["pkg/__init__.py"].summary)
+        self.assertEqual((items["pkg/py.typed"].change_class, items["pkg/py.typed"].summary),
+                         ("build-dependency", "file added; empty file"))
+        self.assertEqual((items["pkg/empty.rs"].change_class, items["pkg/empty.rs"].detail),
+                         ("unknown", {"unknown_reason": "empty-file"}))
+        self.assertNotIn("mode", items["pkg/empty.rs"].summary)
+        # an __init__.py with code is not a package marker
+        self.assertEqual(items["pkg/sub/__init__.py"].change_class, "unknown")
+
+    def test_binary_files_keep_a_precise_path_class(self) -> None:
+        found = self._classes({"tests/data/blob.bin": b"\x00\x01", "assets/blob.bin": b"\x00\x01",
+                               "docs/fig.png": b"\x00\x01"},
+                              {"tests/data/blob.bin": b"\x00\x02", "assets/blob.bin": b"\x00\x02",
+                               "docs/fig.png": b"\x00\x02"})
+        self.assertEqual(found, {"tests/data/blob.bin": {"test-only"}, "assets/blob.bin": {"unknown"},
+                                 "docs/fig.png": {"docs-only"}})
+
+
 class ContentRulesTest(unittest.TestCase):
     """Classifier v3 content rules (what the changed lines do): observability, data-type,
     visibility-rule, access-modifier; each with the cases it must not take."""
@@ -597,9 +756,8 @@ class ContentRulesTest(unittest.TestCase):
                             "unknown"),
             # print() is not telemetry
             "svc/e.py": (b"def run(x):\n    return x\n", b"def run(x):\n    print(x)\n    return x\n", "unknown"),
-            # a comment-only change stays cosmetic; a scoring path keeps its name rule
+            # a comment-only change stays cosmetic
             "svc/f.rs": (fn % b"    // info!(a)\n", fn % b"    // info!(b)\n", "cosmetic"),
-            "scorers/g.rs": (fn % b'    info!("a");\n', fn % b'    info!("b");\n', "scoring-logic"),
         })
 
     def test_data_type_takes_fields_variants_and_attributes(self) -> None:

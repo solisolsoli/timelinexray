@@ -733,8 +733,9 @@ class LedgerAccessTest(unittest.TestCase):
         for line in (modern, legacy):
             assert line is not None
             self.assertLessEqual(len(line), MAX_RESPONSE_BYTES)
-            # comfortable headroom: the listing was ~61.8 KB before Milestone 6
-            self.assertLess(len(line), 40_000)
+            # real headroom: ~61.8 KB before Milestone 6, 39.9 KB with thirteen tools in
+            # 0.11.0, about 33.1 KB after the lean envelope and tighter descriptions
+            self.assertLess(len(line), 34_000)
             listed = json.loads(line)["result"]["tools"]
             self.assertEqual([tool["name"] for tool in listed], EXPECTED_TOOLS)
 

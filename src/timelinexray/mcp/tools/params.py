@@ -155,10 +155,10 @@ GET_PARAM = Tool(
     name="get_param",
     title="Parameter declarations and public default at a commit",
     description=(
-        "Every declaration of a named parameter (param!, const, static or field; exact name "
-        "or qualified name) at a pinned, indexed commit: literal public default, declared "
-        "type, flag string, citation of the declaration span, plus up to 10 lexical mentions "
-        "elsewhere. Public defaults at that commit, never production values."
+        "Every declaration of a named parameter (param!, const, static or field; exact or "
+        "qualified name) at a pinned, indexed commit: literal public default, declared type, "
+        "flag, cited declaration span, and up to 10 lexical mentions elsewhere. Public "
+        "defaults at that commit, never production values."
     ),
     input_schema=S.obj({"commit": S.COMMIT_FULL, "name": NAME}, required=["commit", "name"]),
     data_schema=S.obj(
@@ -293,11 +293,11 @@ PARAM_HISTORY = Tool(
     name="param_history",
     title="Parameter value over the pinned commits",
     description=(
-        "The value of a named parameter at every pinned commit on one line of history (the "
-        "first-parent chain from base to head; default: oldest to newest pin; nothing is "
-        "fetched). Per declaration: value and committer time per commit, changes (declared, "
-        "value-changed, removed) cited on both sides, reversions, current declaration; plus "
-        "gaps where commits are unpinned. Public defaults only, never production values."
+        "A named parameter's value at every pinned commit of one first-parent chain (base to "
+        "head; default: oldest to newest pin; nothing is fetched). Per declaration: value and "
+        "committer time per commit, changes (declared, value-changed, removed) cited on both "
+        "sides, reversions, the current declaration; plus gaps where commits are unpinned. "
+        "Public defaults only, never production values."
     ),
     input_schema=S.obj(
         {

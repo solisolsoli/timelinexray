@@ -107,13 +107,15 @@ scope, not a bug report; where a limit is enforced, the test that enforces it is
   configuration service at runtime is invisible; the `home-mixer` and `vm-ranker` copies of
   a weight are not asserted to correspond; registration detection sees list literals only.
   Name and path classes (`scoring-logic`, `model-config`) say where code lives, not what it
-  does: in a hand check about half of the recent `scoring-logic` items and a quarter over the
-  full history were scoring code ([updates.md](updates.md)). A filtering/visibility *name*
+  does: in a hand check (classifier v4) about half of the recent `scoring-logic` items and a
+  sixth over the full history were scoring code, about four fifths and three fifths with
+  adjacent score plumbing ([updates.md](updates.md)). A filtering/visibility *name*
   rule was mostly wrong and does not exist; `visibility-rule` is a declared-type content rule
   for the rule DSL only, so other filtering code (hydration, staging, treatment) is `unknown`
   unless another rule applies. Content rules (`observability`, `data-type`,
-  `visibility-rule`, `access-modifier`) cover a whole hunk or nothing. About 33 % of the items
-  of `77d431a..78460ca` stay `unknown` (classifier v3); whole added files almost always do.
+  `visibility-rule`, `access-modifier`) cover a whole hunk or nothing. About 31 % of the items
+  of `77d431a..78460ca` stay `unknown` (classifier v4); whole added files of production code
+  almost always do.
 - The main Markdown digest is bounded by row budgets; on a large range it names what it cut
   and the appendix holds the rest. The appendix and the JSON document are not bounded
   (the appendix of `aaa167b..77d431a` is about 1.1 MB).

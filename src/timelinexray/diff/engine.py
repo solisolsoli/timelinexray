@@ -24,11 +24,13 @@ Classification of one changed file (first matching rule wins for the whole file)
      is an import or bodyless module declaration; ``access-modifier`` when the tokens are
      equal once access modifiers are removed; else ``scoring-logic`` or ``model-config``
      from path and symbol names (:func:`timelinexray.diff.rules.logic_match`, reading only
-     symbols that enclose a changed production line); else a content class
-     (:mod:`timelinexray.diff.content`): ``observability`` (only log, trace or metric
-     statements), ``data-type`` (only Rust type-definition lines that assign no value),
-     ``visibility-rule`` (only lines of visibility rule declarations); else ``unknown``,
-     which records why in ``detail.unknown_reason``.
+     symbols that enclose a changed production line; kernel and training locations first);
+     else a content class (:mod:`timelinexray.diff.content`): ``observability`` (only log,
+     trace or metric statements), ``data-type`` (only Rust type-definition lines that assign
+     no value), ``visibility-rule`` (only lines of visibility rule declarations); else
+     ``unknown``, which records why in ``detail.unknown_reason``. ``observability``, and
+     ``data-type`` when the scoring word came from the path alone, also replace
+     ``scoring-logic`` (classifier version 4).
 
 Adjacent hunks of the same class inside the same symbol form one item. Every item cites an
 exact span on each side, read with :func:`timelinexray.span.read_span` from the blob bytes.
@@ -74,11 +76,13 @@ from .rules import (
     OBSERVABILITY,
     PARAMETER_DEFAULT,
     REGISTRATION,
+    SCORING_LOGIC,
     TEST_ONLY,
     UNKNOWN,
     VISIBILITY_RULE,
     class_rank,
     is_key_value_config,
+    is_scoring_symbol,
     logic_match,
     path_class,
 )
@@ -468,16 +472,19 @@ class _FileContext:
 
     def classify(self) -> list[_Builder]:
         change = self.change
+        sides = [(e.path, e.reason) for e in (self.old_entry, self.new_entry) if e is not None]
+        path_classes = [path_class(path, reason) for path, reason in sides]
         if change.analysis != "text":
             reasons = {e.reason for e in (self.old_entry, self.new_entry) if e is not None}
             cls = GENERATED_VENDORED if reasons & {"generated", "vendored"} else UNKNOWN
+            if cls == UNKNOWN and all(c is not None for c in path_classes):
+                # a binary or symlink under a test, docs or build path keeps that path class
+                cls = min(path_classes, key=class_rank)  # type: ignore[arg-type]
             return [_Builder(cls, "file", self._file_summary("not compared as text: "
                                                                + change.analysis[len("not-text:"):]),
                              self.side_citation("old", [], whole=True),
                              self.side_citation("new", [], whole=True),
                              {"unknown_reason": "not-text"} if cls == UNKNOWN else {})]
-        sides = [(e.path, e.reason) for e in (self.old_entry, self.new_entry) if e is not None]
-        path_classes = [path_class(path, reason) for path, reason in sides]
         if all(cls is not None for cls in path_classes):
             cls = min(path_classes, key=class_rank)  # type: ignore[arg-type]
             return [self._file_item(cls)]
@@ -496,8 +503,10 @@ class _FileContext:
     def _file_item(self, cls: str) -> _Builder:
         change = self.change
         whole = not self.hunks
-        text = (f"-{change.lines_removed} +{change.lines_added} lines" if self.hunks
-                else "content unchanged")
+        if self.hunks:
+            text = f"-{change.lines_removed} +{change.lines_added} lines"
+        else:
+            text = "empty file" if change.status in (ADDED, REMOVED) else "content unchanged"
         return _Builder(cls, "file", self._file_summary(text),
                         self.side_citation("old", self.hunks, whole=whole),
                         self.side_citation("new", self.hunks, whole=whole),
@@ -507,6 +516,17 @@ class _FileContext:
         change = self.change
         if change.status == RENAMED:
             cls, kind, text = COSMETIC, "moved", "content identical"
+        elif change.status in (ADDED, REMOVED):
+            # no hunk on an added or removed file: the file is empty (classifier version 4)
+            kind, text = "file", "empty file"
+            name = posixpath.basename(change.new_path or change.old_path or "")
+            cls = BUILD_DEPENDENCY if name == "__init__.py" else UNKNOWN
+            if cls == BUILD_DEPENDENCY:
+                text = "empty file (a Python package marker)"
+            return _Builder(cls, kind, self._file_summary(text),
+                            self.side_citation("old", [], whole=True),
+                            self.side_citation("new", [], whole=True),
+                            {"unknown_reason": "empty-file"} if cls == UNKNOWN else {})
         else:
             cls, kind = UNKNOWN, "mode"
             text = f"file mode changed {change.old_mode} -> {change.new_mode}; content unchanged"
@@ -694,10 +714,13 @@ class _FileContext:
             else:
                 names = _rule_symbols(old_a, old_lines) + _rule_symbols(new_a, new_lines)
                 cls, rule, matched = logic_match(self.paths, names)
+                found = _content_class(old_a, old_lines, new_a, new_lines)
+                if cls == SCORING_LOGIC and _content_wins(found, rule, names):
+                    cls, rule, matched = str(found), None, None
                 if rule is not None and matched is not None:
                     match = (rule, matched)
                 elif cls == UNKNOWN:
-                    cls = _content_class(old_a, old_lines, new_a, new_lines) or UNKNOWN
+                    cls = found or UNKNOWN
             regions.append((cls, hunk, self._group_symbol(hunk), match))
         builders: list[_Builder] = []
         group: list[Hunk] = []
@@ -729,11 +752,19 @@ class _FileContext:
     @staticmethod
     def _in_tests(old_a: BlobAnalysis | None, old_lines: list[int],
                   new_a: BlobAnalysis | None, new_lines: list[int]) -> bool:
-        if not old_lines and not new_lines:
-            return False
-        old_ok = not old_lines or (old_a is not None and old_a.in_test_ranges(old_lines))
-        new_ok = not new_lines or (new_a is not None and new_a.in_test_ranges(new_lines))
-        return old_ok and new_ok
+        """Every changed code line on both sides lies in test code (blank and comment-only
+        lines may accompany them), and at least one side has such a line."""
+        verdicts = []
+        for analysis, lines in ((old_a, old_lines), (new_a, new_lines)):
+            if not lines:
+                continue
+            if analysis is None:
+                return False
+            verdict = analysis.in_test_code(lines)
+            if verdict is False:
+                return False
+            verdicts.append(verdict)
+        return any(verdict is True for verdict in verdicts)
 
     @staticmethod
     def _license_lines(old_a: BlobAnalysis | None, old_lines: list[int],
@@ -831,6 +862,16 @@ def _content_class(old_a: BlobAnalysis | None, old_lines: list[int],
         if False not in verdicts and True in verdicts:
             return cls
     return None
+
+
+def _content_wins(found: str | None, rule: str | None, names: tuple[str, ...]) -> bool:
+    """Whether a content class replaces the scoring-name rule (classifier version 4): every
+    changed line only logs, traces or counts (``observability``), or every changed line is a
+    Rust type-definition line and the scoring word came from the path alone, with no enclosing
+    symbol named for scoring (``data-type``: a ``weights`` struct stays ``scoring-logic``)."""
+    if found == OBSERVABILITY:
+        return True
+    return found == DATA_TYPE and rule == "path" and not any(is_scoring_symbol(n) for n in names)
 
 
 def _rule_symbols(analysis: BlobAnalysis | None, lines: list[int]) -> tuple[str, ...]:
