@@ -4,6 +4,22 @@ All notable changes to this project are recorded here. Versions follow PEP 440.
 
 ## [Unreleased]
 
+### Added
+
+- A source-reviewed upstream report for `78460ca..92f0918` (2026-10-15), with pinned
+  citations for changed defaults, new scoring/model inputs, gated video paths and visibility
+  rule changes. Home Mixer and VM Ranker defaults are kept separate; no production or
+  deployment claims are inferred.
+- Additive upstream citation goldens and acceptance coverage for `92f0918`, including
+  separate parameter declarations at both code locations. The developer/CI fetch helper
+  now supplies its 49-commit history. The runtime setup pin, historical golden set and
+  semantic gate sets remain unchanged.
+
+### Fixed
+
+- The MCP limits document no longer lists the implemented `get_param` and `param_history`
+  tools as unimplemented.
+
 ### Note on the semantic gate
 
 - The MCP tool descriptions and published schemas were tightened after the passing gate run

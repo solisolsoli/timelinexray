@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Fetch the upstream repository at the pinned test commit (developer and CI helper).
+"""Fetch the required upstream test snapshot (developer and CI helper).
 
 Not part of the ``timelinexray`` package and never imported by it. Creates DIR (a plain git
-repository without a checkout) whose ``main`` is the pinned commit with its full history,
-which is what ``TXRAY_TEST_UPSTREAM`` must point to so that no upstream-dependent test is
-skipped. Already present: nothing is fetched. Uses the system ``git`` with user and system
-configuration ignored and the single https transport allowed.
+repository without a checkout) whose ``main`` is the 2026-10-15 acceptance snapshot with its
+full history. That history includes the immutable 77d431a release-test pin and the intervening
+parameter-history snapshots. Already present: nothing is fetched. Uses system ``git`` with
+user and system configuration ignored and the single https transport allowed.
 
     python scripts/fetch_test_upstream.py DIR [--url URL] [--commit SHA]
 """
@@ -20,8 +20,8 @@ import sys
 from pathlib import Path
 
 URL = "https://github.com/xai-org/x-algorithm.git"
-COMMIT = "77d431aabf409ca1c1eed9bec7e2183f7c914e23"
-HISTORY = 39  # commits reachable from COMMIT
+COMMIT = "92f0918f6cb52837cb53a8c790c68f906b2c0db1"
+HISTORY = 49  # commits reachable from COMMIT; includes the legacy release-test pin
 # Transport policy for every git call: only https (tests widen it to a local file:// fixture).
 TRANSPORT = ("-c", "protocol.allow=never", "-c", "protocol.https.allow=always")
 

@@ -132,8 +132,8 @@ scope, not a bug report; where a limit is enforced, the test that enforces it is
 ## MCP server
 
 - stdio only; there is no HTTP profile and there are no MCP resources. The P7 tools
-  `explain_component`, `get_param`, `param_history` and `diff_since` are not implemented
-  ([mcp.md](mcp.md)).
+  `explain_component` and `diff_since` are not implemented ([mcp.md](mcp.md)); `get_param`
+  and `param_history` are implemented with the limitations described above.
 - **Tested clients** (details in the client matrix of [mcp.md](mcp.md)): the test suite's
   own stdio client, and Claude Code 2.1.286 on macOS in print mode with the modern protocol
   and the code tools only. The findings tools have not been run with a real client. Every

@@ -880,7 +880,7 @@ class FetchUpstreamScriptTest(unittest.TestCase):
         directory = UPSTREAM.parent if UPSTREAM.name == ".git" else UPSTREAM
         proc = self.run_script(str(directory), "--url", "https://example.invalid/none.git")
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertIn(b"with 39 commits of history", proc.stdout)
+        self.assertIn(b"with 49 commits of history", proc.stdout)
 
 
 if __name__ == "__main__":
