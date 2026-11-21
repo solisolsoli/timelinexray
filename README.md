@@ -2,128 +2,62 @@
 
 # TimelineXray
 
-**Read X's open-source recommendation algorithm with receipts.**
+**Read what X's published ranking code actually says, with every claim tied to the exact lines.**
 
-Commit-pinned evidence, exact source spans and a findings memory that notices when the code changes,
-for people and AI agents studying [`xai-org/x-algorithm`](https://github.com/xai-org/x-algorithm).
+A command-line tool and a read-only MCP server for researchers, journalists, developers and
+AI agents who study the open-source recommendation code in
+[`xai-org/x-algorithm`](https://github.com/xai-org/x-algorithm).
 
 [![ci](https://github.com/solisolsoli/timelinexray/actions/workflows/ci.yml/badge.svg)](https://github.com/solisolsoli/timelinexray/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python 3.11 | 3.12 | 3.13](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg)](pyproject.toml)
-[![Runtime dependencies: none](https://img.shields.io/badge/runtime%20dependencies-none-brightgreen.svg)](pyproject.toml)
-[![MCP: read-only](https://img.shields.io/badge/MCP-read--only%20server-purple.svg)](docs/mcp.md)
 
-[Quickstart](#quickstart) · [Why](#why) · [Features](#features) · [MCP for agents](#use-it-from-an-ai-agent-mcp) · [Docs](#documentation) · [Limits](docs/limits.md)
+[Quick start](#quick-start) · [How it works](#how-it-works) · [Theory and evidence](#theory-and-evidence) · [Documentation](docs/README.md) · [Limits](docs/limits.md)
 
 </div>
 
 Independent community analysis of publicly available source code. Not affiliated with or endorsed by X or xAI.
 
-```console
-$ txray param-history ClickWeight        # excerpt
-param!      ClickWeight  home-mixer/params/param.rs
-  2026-09-26T03:39:02Z  4c5cfe8f07f1  present at the start of the line, public default 0.4
-  2026-09-29T03:06:30Z  a707cc27ba36  value changed: public default 0.4 -> 0.3  (old L322 sha256:b01734cae3e1124e at 4c5cfe8f07f1; new L329 sha256:4b5c535dbf7b2b6a)
-  current: public default 0.3 at 77d431aabf40 (3 pinned commit(s) with a value)
-...
-note        values are public defaults at the cited commits, not production values; computed from pinned commits only (nothing fetched)
-```
+<picture>
+  <source media="(max-width: 700px) and (prefers-color-scheme: dark)" srcset="docs/img/overview-narrow-dark.svg">
+  <source media="(max-width: 700px)" srcset="docs/img/overview-narrow-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/overview-dark.svg">
+  <img src="docs/img/overview-light.svg" width="100%" alt="Four steps. 1: the published repository is pinned at commit 92f0918. 2: an exact span, line 347 of home-mixer/params/param.rs, is read from the git blob with its SHA-256 and the anchor ClickWeight. 3: a finding says the public default of ClickWeight is 0.3 at that commit and is reviewed by a different reviewer. 4: at the newer commit ed78e06 the cited bytes are gone, so the finding becomes STALE and goes back to review.">
+</picture>
 
-## Why
+**The idea in one example.** At commit `92f0918` the published code declares
+`ClickWeight` in `home-mixer/params/param.rs` with the public default `0.3` (line 347). A
+finding records that and cites those exact bytes. At the newer commit `ed78e06` the line
+reads `0.274` (now line 492), so TimelineXray marks the finding `STALE` instead of letting
+it quietly stay "true". Someone then re-reads both spans and decides.
 
-When the recommendation code behind a large social network is published, most of what gets
-written about it is screenshots, paraphrase and threads that go stale with the next commit.
-The upstream repository changes often, its commit messages say almost nothing (most read
-"Open-source X Recommendation Algorithm"), and the numbers in it are defaults that a
-configuration system can override.
+## What you can ask it
 
-TimelineXray makes every statement about that code checkable:
-
-- **Pinned, not moving.** Every answer names a commit. Nothing depends on a branch.
-- **Exact bytes.** A citation is a line span read from a git blob, with its SHA-256 and an
-  anchor check, so anyone can reproduce it.
-- **Findings that expire.** Claims live in a hash-chained ledger; when a newer commit changes
-  the cited code, the claim is marked `STALE` instead of quietly staying "true".
-- **Honest numbers.** Every value is labelled a *public default at a commit*, never a
-  production value or a reach prediction.
-
-## Features
-
-| | |
+| Question | Command |
 | --- | --- |
-| **One-command setup** | `install.sh` checks Python, SQLite FTS5 and git, then installs `txray`; `txray setup` pins and indexes the tested upstream commit and prints your next commands and the agent connection line. |
-| **Snapshots and manifests** | Pin upstream commits into a local bare mirror; classify **every** path (parsed, text, excluded with a reason) with blob ids, sizes, hashes and a license inventory. |
-| **Exact spans** | `txray show` reads line ranges from blobs (never a working tree), keeps CRLF and missing final newlines, and reports span and blob SHA-256 plus whether an anchor occurs. |
-| **Native code index** | Lexical search, symbols and unresolved call candidates for Rust, Scala, Python and Java on SQLite FTS5: 2,147 files and 50,387 symbols at `77d431a`. |
-| **Parameter tools** | `txray param` and `txray param-history` find declarations and their public defaults and trace value changes across pinned commits, both sides cited. |
-| **Findings memory** | A hash-chained ledger of claims whose every citation is a byte span; re-anchoring marks changed evidence `STALE`; only a different reviewer can confirm a claim. |
-| **Change digests** | `txray diff`, `digest` and `update` classify what changed between two commits from the diff itself (never from commit messages) and list the findings it touches: a short main digest (summary, parameter defaults, registrations, scoring changes, with citations), an appendix with every other item, and the complete JSON. |
-| **Read-only MCP server** | Thirteen tools over stdio (`search_code`, `read_span`, `find_symbols`, `get_param`, `param_history`, `verify_claim`, `stale_worklist`, ...) so agents cite instead of guess. |
-| **Offline creator metrics** | `txray metrics` computes descriptive metrics from *your own* analytics export in a network-disabled process. Never a reach prediction. |
-| **Context Layer export** | Optional: write current findings as Markdown notes with permalinks and `[[wikilinks]]` for a [Context Layer](https://github.com/solisolsoli/context-layer) or Obsidian vault. |
+| What do these lines say at this commit, exactly? | `txray show` |
+| Where is a name defined or mentioned? | `txray search`, `txray symbols` |
+| What is the public default of a parameter, and when did it change? | `txray param`, `txray param-history` |
+| What changed in the code between two commits? | `txray diff`, `txray digest`, `txray update` |
+| Which of my recorded claims still hold at the newest commit? | `txray findings reanchor`, `txray findings stale` |
+| Can my AI agent answer with citations instead of guesses? | `txray mcp serve` |
 
-Pure standard library at runtime. The only network access is `git fetch` from an allowlisted
-upstream URL. No X API, no scraping, no posting, no telemetry.
+Every answer names its commit. Every number is a **public default at that commit**,
+never a production value.
 
-## Quickstart
+## Quick start
 
-Two commands take you from nothing to a cited answer. You need Linux or macOS, Python 3.11+
-with SQLite FTS5 (trigram tokenizer) and git 2.38+; the installer checks all three first.
+You need Linux or macOS, Python 3.11+ with SQLite FTS5 and git 2.38+; the installer checks
+all three first and never edits your shell files.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/solisolsoli/timelinexray/main/install.sh | sh
-txray setup
-```
-
-The installer prints what it found and what it runs (excerpt; it uses `uv` or `pipx` when
-present, else a private virtual environment, and never edits your shell files):
-
-```console
-$ curl -fsSL https://raw.githubusercontent.com/solisolsoli/timelinexray/main/install.sh | sh
-os: Darwin
-python: /usr/bin/python3 (3.12.4, SQLite 3.45.3 with FTS5 and the trigram tokenizer)
-git: /usr/bin/git (2.54)
-method: venv
-package: git+https://github.com/solisolsoli/timelinexray@main
-...
-+ ~/.local/share/timelinexray/venv/bin/python -m pip install --disable-pip-version-check git+https://github.com/solisolsoli/timelinexray@main
-+ ln -sf ~/.local/share/timelinexray/venv/bin/txray ~/.local/bin/txray
-+ ~/.local/bin/txray --version
-txray 0.11.0
-
-TimelineXray is installed. Next step:
-  txray setup
-```
-
-`txray setup` pins the tested upstream commit (`77d431a`) and builds its code index, once
-(excerpt; paths shortened, timings from one laptop):
-
-```console
-$ txray setup
-commit     77d431aabf409ca1c1eed9bec7e2183f7c914e23
-store      ~/.cache/timelinexray
-pin        pinned (fetched from the upstream)
-index      indexed: 2147 paths, 2140 files with indexed lines, 50387 symbols
-elapsed    8.16 s
-
-try next
-  txray search 77d431a ClickWeight
-  txray param ClickWeight --commit 77d431a
-  txray show 77d431a README.md --lines 1-20
-
-connect an agent (prints only; no client configuration is edited)
-  claude mcp add --transport stdio timelinexray -- /path/to/bin/txray mcp serve --store /path/to/store
-  txray setup --print-mcp-config json   (an mcpServers snippet)
-
-Numbers in the code are public defaults at the pinned commit, not production values.
-```
-
-A second `txray setup` fetches and indexes nothing (0.17 s on the same laptop). Then ask
-for a cited answer:
-
-```sh
+txray setup        # pins and indexes the tested upstream commit, once
 txray show 77d431a home-mixer/params/param.rs --lines 327-331 --anchor ClickWeight
 ```
+
+The third command prints the lines together with everything needed to check them
+(real output):
 
 ```console
 commit     77d431aabf409ca1c1eed9bec7e2183f7c914e23
@@ -143,179 +77,151 @@ param!(OpenLinkWeight, f64, "rust_home_mixer_open_link_weight", 0.2);
 param!(
 ```
 
-Other ways to install (all give the same `txray`; details, options, uninstall and
-troubleshooting in [docs/install.md](docs/install.md)):
-
-```sh
-uv tool install git+https://github.com/solisolsoli/timelinexray
-pipx install git+https://github.com/solisolsoli/timelinexray
-
-# read the script before running it
-curl -fsSLO https://raw.githubusercontent.com/solisolsoli/timelinexray/main/install.sh
-sh install.sh --dry-run     # prints every command, changes nothing
-sh install.sh
-```
+Anyone can reproduce the span hash with plain git: the bytes of lines 327-331 of that blob
+hash to `b923bbcb...`. Other ways to install (`uv`, `pipx`, inspecting the script first) and
+uninstalling are in [docs/install.md](docs/install.md).
 
 ## How it works
 
-```mermaid
-flowchart LR
-    U[(xai-org/x-algorithm)] -- "git fetch<br/>allowlisted URL only" --> M[Bare mirror<br/>pinned commits]
-    M --> F[Manifest<br/>every path, hashed]
-    M --> S[Exact spans<br/>blob bytes + SHA-256]
-    M --> I[Code index<br/>SQLite FTS5, symbols]
-    I --> P[Parameters<br/>public defaults + history]
-    S --> L[Findings ledger<br/>hash chain]
-    L -- "re-anchor on a newer commit" --> R{CURRENT / STALE /<br/>UNVERIFIABLE}
-    M --> D[Diffs and digests<br/>local files]
-    S & I & P & L --> X[Read-only MCP server<br/>stdio]
+<picture>
+  <source media="(max-width: 700px) and (prefers-color-scheme: dark)" srcset="docs/img/pipeline-narrow-dark.svg">
+  <source media="(max-width: 700px)" srcset="docs/img/pipeline-narrow-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/pipeline-dark.svg">
+  <img src="docs/img/pipeline-light.svg" width="100%" alt="Four tiers. Source: the public upstream repository is fetched only from an allowlisted URL into a local snapshot store of pinned commits. Evidence: a manifest of every path, an exact span reader, and a code index with parameters. Knowledge: a hash-chained findings ledger, and classified diffs and digests. Access: the txray command line and a read-only MCP server.">
+</picture>
+
+Five ideas carry the whole tool:
+
+- **Commit pinning.** Work happens at a full commit id, never at a branch. A pinned commit
+  is protected in a local mirror, so it stays readable even if the upstream history is
+  rewritten later.
+- **Spans.** A citation is a line range cut from the git blob as raw bytes, with the
+  SHA-256 of exactly those bytes and an anchor word that must occur inside them. Nothing is
+  reformatted, so a citation means the same thing to everyone.
+- **The code index.** Search, declarations and parameter values per commit, built from
+  the same blobs (SQLite full-text search; Rust, Scala, Python and Java). It finds things;
+  citations still come from the blob.
+- **Findings and their life cycle.** A finding is one falsifiable sentence with its
+  citations. It starts as a draft, only a *different* reviewer can confirm it, and when a
+  newer commit is pinned it is re-checked: `CURRENT` if the cited bytes are still there,
+  `STALE` if they changed, `UNVERIFIABLE` if they cannot be placed. Stale findings go to a
+  re-review list; nothing is silently updated.
+- **A read-only MCP server.** Thirteen tools (`read_span`, `search_code`, `get_param`,
+  `param_history`, `verify_claim`, `stale_worklist`, ...) let an AI agent cite instead of
+  guess. The server never fetches and never writes.
+
+What it looks like when the code changes under a finding (real output, excerpt; the store holds
+`92f0918` and `ed78e06`, pinned with `txray setup --commit <id>`):
+
+```console
+$ txray findings add --actor author-1 --component home-mixer --evidence-class PARAM_DEFAULT \
+    --status SUPPORTED --title "ClickWeight public default (Home Mixer)" \
+    --claim "At 92f0918 the public default of ClickWeight in home-mixer/params/param.rs is 0.3." \
+    --cite 92f0918 home-mixer/params/param.rs 347-347 ClickWeight
+created    F-edd0332b2ae6  (draft, SUPPORTED (proposed))
+
+$ txray findings review F-edd0332b2ae6 --actor author-1 --role reviewer --status SUPPORTED --rationale "..."
+txray: error: no self-approval: author-1 created finding F-edd0332b2ae6 (create); another reviewer must review it
+
+$ txray findings reanchor --latest
+target     ed78e0645cfafcd026cfc1fd0da964f630533334
+findings   1: STALE 1
+F-edd0332b2ae6           STALE         changed 1  citation 1 home-mixer/params/param.rs:347-347@92f0918f6cb5 changed: the cited bytes of lines 347-347 are not in home-mixer/params/param.rs at the target; the line diff aligns them with lines 492-492
+
+$ txray param-history ClickWeight          # excerpt
+param!      ClickWeight  home-mixer/params/param.rs
+  2026-10-15T00:55:41Z  92f0918f6cb5  present at the start of the line, public default 0.3
+  2026-11-20T05:53:35Z  ed78e0645cfa  value changed: public default 0.3 -> 0.274  (old L347 sha256:4b5c535dbf7b2b6a at 92f0918f6cb5; new L492 sha256:edcf89e31c669970)
+param!      ClickWeight  vm-ranker/params.rs
+  2026-10-15T00:55:41Z  92f0918f6cb5  present at the start of the line, public default 0.3
+  current: public default 0.3 at ed78e0645cfa (2 pinned commit(s) with a value)
+note        values are public defaults at the cited commits, not production values; computed from pinned commits only (nothing fetched)
 ```
 
-Upstream code is only ever read as data from git objects: never checked out into an agent's
-project, never executed, never redistributed. Details: [docs/architecture.md](docs/architecture.md).
+(The finding was verified and reviewed by `reviewer-1` between the second and third
+commands; `txray findings stale` then lists the old span, the aligned candidate at line 492
+and the exact commands to supersede, review or retract it.) Note the two declarations: the
+published code at `ed78e06` holds `ClickWeight` in two files with two different public
+defaults, and TimelineXray keeps them apart instead of guessing which one a request reads.
 
-## Use it from an AI agent (MCP)
+### Use it from an AI agent
 
 ```sh
-txray setup --print-mcp-config      # prints the exact `claude mcp add ...` line, absolute paths
+txray setup --print-mcp-config      # prints the exact `claude mcp add ...` line; edits nothing
 ```
 
-Run the printed line once; it looks like
-`claude mcp add --transport stdio timelinexray -- /path/to/bin/txray mcp serve --store /path/to/store`.
-`--print-mcp-config json` prints an `mcpServers` snippet for other stdio clients; neither form
-edits any client configuration. See [docs/agents/](docs/agents/) for configuration files and a
-short evidence snippet for your `AGENTS.md` / `CLAUDE.md`. The server is read-only, never
-fetches, and refuses a store that contains an analytics dataset. Tested so far: Claude Code
-2.1.286 (print mode, code tools); every other client is listed as untested in the
-[client matrix](docs/mcp.md#client-matrix).
+The printed line looks like
+`claude mcp add --transport stdio timelinexray -- /path/to/bin/txray mcp serve --store /path/to/store`;
+`--print-mcp-config json` prints an `mcpServers` snippet for other stdio clients. Rules for
+agents (answer only from spans they read, abstain on request-time values) are in
+[docs/agents/](docs/agents/). Tested client so far: Claude Code; every other client is
+listed as untested in the [client matrix](docs/mcp.md#client-matrix).
 
-## What it is not, and when not to use it
+## What it does not claim
 
-- **Not a reach predictor or an "algorithm score".** Nothing it computes predicts reach or
-  reconstructs a ranking score. The upstream README (at `77d431a`) says many tunable values
-  come from a configuration system and experiments run on a share of traffic, so numbers in
-  the code are shown as public defaults at a named commit.
-- **Not an X API client, scraper, posting bot or engagement automation.** No telemetry.
-- **Not a runner of upstream code.** Upstream files are parsed and read as data only.
-- **Not a redistribution of upstream source.** The upstream repository is fetched at runtime
-  into a local store; this repository contains none of it.
+- **It reads published code; it does not observe X's production system.** No live values,
+  experiment assignments, model weights, user data or request-time scores are in the
+  repository, so none are in TimelineXray. The upstream README (at `77d431a`) says tunable
+  values come from a configuration system and that experiments run on a share of traffic;
+  that is why every number is labelled a public default at a named commit.
+- **No reach prediction and no "algorithm score".** Nothing it computes predicts reach or
+  reconstructs a ranking.
+- **A matching hash is text identity, not truth.** The tool can show that bytes are
+  unchanged; only a reviewer can say that a claim about them is right.
+- **Not an X API client, scraper or posting bot.** The only network access is `git fetch`
+  from the allowlisted upstream URL. No telemetry.
+- **Never runs upstream code and never redistributes it.** Upstream files are fetched at
+  runtime into a local store and read as data.
+- **Unofficial.** It has no relation to X or xAI. Windows is not supported yet, and the
+  parser is lexical (no type resolution). Every known limit is in
+  [docs/limits.md](docs/limits.md).
 
-Reach for something else if you want growth tips, a posting schedule or a single score for
-a post: TimelineXray answers "what does the public code say, at which commit, in which
-bytes", and stops there. Windows is not supported yet, and the parser is lexical (no type
-resolution); see [docs/limits.md](docs/limits.md).
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `txray setup` | Pin and index a commit once (default: the tested commit), then print next steps and the agent connection line. |
+| `txray pin`, `manifest` | Pin a commit by full or short id; list every path with its class, hashes and licence files. |
+| `txray show` | Print an exact line span with blob and span SHA-256 and an anchor check (`--raw` for bytes only). |
+| `txray index`, `search`, `symbols` | Build the code index of a commit; search lines; list declarations. |
+| `txray param`, `param-history` | A parameter's declarations and public default at a commit; its value at every pinned commit. |
+| `txray findings ...` | `add`, `verify`, `review`, `reanchor`, `stale`, `supersede`, `retract`, `import`, `export`, `verify-log`. |
+| `txray diff`, `digest`, `update` | Classified changes between two pins, cited on both sides; a guarded fetch of the newest head. |
+| `txray mcp serve`, `mcp tools` | The read-only MCP server over stdio, and its tool list. |
+| `txray metrics` | Optional: descriptive metrics from *your own* analytics export, in a process with the network disabled. |
+
+Every command accepts `--json` for a machine-readable envelope and `--store DIR` for the
+snapshot store, except that `txray mcp serve` takes `--store`, `--ledger` and
+`--time-budget` but no `--json`, and `txray mcp tools` takes `--json` only. Exit codes: `0`
+success, `1` failed or refused, `2` invalid arguments, `3` network access refused by the
+allowlist. The full option list of each command is in its document under [docs/](docs/README.md).
+
+## Theory and evidence
+
+For readers who want to know *why* this design, and how well it works. Start at the
+[documentation index](docs/README.md), or go straight to a topic:
+
+| Topic | What you will find |
+| --- | --- |
+| [The evidence model](docs/evidence-model.md) | Why spans and commit pins; the byte-exact citation; what counts as a claim; who may confirm one. |
+| [Staleness](docs/staleness.md) | How a cited span is re-located on a newer commit, when a finding becomes `STALE`, and how that is tested. |
+| [The change classifier](docs/classifier.md) | How diffs are classified, the five classifier versions, and their measured precision. |
+| [Reviewing upstream changes](docs/upstream-reviews.md) | The procedure for a new upstream snapshot, its acceptance goldens, and the two reviews so far. |
+| [Evaluation](docs/evaluation.md) | The mechanical release gates and the semantic gate with an AI agent: method, thresholds and every measured run. |
+| [Limits](docs/limits.md) | What can and cannot be inferred from published code, and everything else the tool does not do. |
+
+Measured, not asserted: the controlled mutation suite flags 7 of 7 invalidating changes and
+0 of 4 harmless ones; the semantic gate (40 reviewed questions answered by an agent through
+the MCP tools, scored by rule) passed on 2026-10-07 with precision 30/30 and abstention 9/9,
+one run of one model, after three runs that did not pass. Conditions and caveats are in
+[docs/evaluation.md](docs/evaluation.md).
 
 ## Status
 
-Version `0.11.0`, alpha: all six milestones are implemented (evidence foundation, native code
-index, findings memory, read-only MCP server, change digests and offline metrics, release
-hardening), plus the fixes of an end-to-end audit. Interfaces may change before 1.0.
-
-Quality is measured, not asserted. `make ci` runs 863 tests against the real upstream, and the CI
-workflow runs it on Linux and macOS for Python 3.11, 3.12 and 3.13. The semantic release gate (40 reviewed questions answered by
-an agent through the MCP tools, scored by rule) **passed for the first time on 2026-10-07**
-(set revision 2, agent contract r2, haiku): precision 30/30, coverage 30/31, abstention 9/9,
-false abstentions 1/31, 48/48 intact citations, no errors. It is one run of one model, and earlier
-runs of the same set varied (abstention 9/9, then 7/9), so it shows the gate can be met, not that
-every run meets it; the three earlier runs did not pass and stay recorded as measured. The numbers, the analysis and the
-next steps are in [docs/release-checklist.md](docs/release-checklist.md#3a-semantic-release-gate-audit-section-6-item-5-p7-sections-71-73).
-Every known limit is listed in [docs/limits.md](docs/limits.md).
-
-## Command reference
-
-```sh
-# One command after installing: pin + index the tested commit, print next steps
-txray setup                      # --latest pins upstream main instead; --no-index pins only
-txray setup --print-mcp-config   # prints the `claude mcp add` line (or `json`); changes nothing
-
-# Pin a commit (fetches from the allowlisted upstream only if the commit is not yet local)
-txray pin 77d431aabf409ca1c1eed9bec7e2183f7c914e23
-
-# Every path with its classification; --summary for counts and license files
-txray manifest 77d431a --summary
-
-# Exact lines 57-60 of a file, with blob and span hashes and an anchor check
-txray show 77d431a xai-value-model/scoring.rs --lines 57-60 --anchor "fn apply"
-
-# Only the span bytes, byte for byte
-txray show 77d431a xai-value-model/scoring.rs --lines 57-60 --raw
-
-# Native code index for a pinned commit, then search and list symbols
-txray index 77d431a --coverage
-txray search 77d431a "PhoenixScorer" --path "home-mixer/*" --limit 5
-txray symbols 77d431a --name compute_weighted_score
-
-# Parameter declarations with their public default at a commit, and over the pinned commits
-txray param ClickWeight --commit 77d431a
-txray param-history ClickWeight          # 0.4 -> 0.3 at a707cc2, both sides cited; no fetch
-
-# Read-only MCP server for agents (stdio; see docs/mcp.md and docs/agents/)
-txray mcp serve --store ~/.cache/timelinexray --ledger ~/.cache/timelinexray/findings
-txray mcp tools --json
-
-# Findings ledger (kept outside any git working tree: --ledger, $TXRAY_FINDINGS or <store>/findings)
-txray findings add --actor author-1 --title "..." --claim "..." --evidence-class CODE \
-    --status SUPPORTED --cite 77d431a xai-value-model/scoring.rs 65-119 compute_weighted_score
-txray findings verify F-...        # span integrity only (INTACT / CHANGED / MISSING)
-txray findings reanchor <newer-commit>   # freshness only: CURRENT / STALE / UNVERIFIABLE
-txray findings stale               # what to re-review first: old and aligned spans, exact commands
-txray findings verify --pin-cited  # pin the commits imported citations name, re-verify, re-anchor
-txray findings review F-... --actor reviewer-1 --role reviewer --status SUPPORTED --rationale "..."
-txray findings verify-log          # hash chain and HEAD
-
-# Classified changes and a reviewed digest between two pinned commits (nothing is posted)
-txray diff   4c5cfe8 a707cc2 --class parameter-default
-txray digest 4c5cfe8 a707cc2 --out ~/txray-digests   # main digest + appendix; --ledger DIR for affected findings
-txray update --out ~/txray-digests   # guarded fetch + pin + digest; schedule it yourself
-txray update --out ~/txray-digests --reanchor --export ~/vault/txray
-    # also re-anchors the ledger on the new head and refreshes the notes
-    # (docs/updates.md, "Keeping the ledger fresh")
-
-# Offline creator metrics from your own export (network disabled in this process)
-txray metrics import export.csv --schema x-post-v1 --lang en --dump-header   # header mapping only: no data row read, nothing written
-txray metrics import export.csv --schema x-post-v1 --lang en --out ~/private/txray-metrics \
-    --captured-at 2026-09-30T18:00:00+09:00 --counts cumulative --scope combined
-txray metrics rwe ~/private/txray-metrics
-txray metrics reach ~/private/txray-metrics --horizon 24h
-```
-
-`txray digest --out` and `txray export --out` refuse a symbolic link, a missing parent, the
-working tree, the snapshot store, the ledger and an analytics dataset as destination.
-
-Analytics datasets are private: keep them outside the snapshot store and version control;
-they are never served over MCP. Every metrics output starts with the notice "This is not a
-reach prediction."
-
-Every command accepts `--json` for a machine-readable envelope and `--store DIR` to choose
-the snapshot store, except that `txray mcp serve` takes `--store`, `--ledger` (default `$TXRAY_FINDINGS`, else
-`<store>/findings`) and `--time-budget` but no `--json`, and `txray mcp tools` takes `--json` only.
-
-| Setting | Meaning |
-| --- | --- |
-| `--store DIR`, `TXRAY_STORE` | Snapshot store location. Default: `$XDG_CACHE_HOME/timelinexray` or `~/.cache/timelinexray`. Keep it outside any agent's project directory. |
-| `--upstream URL` | Repository to pin from. Default and only network URL: `https://github.com/xai-org/x-algorithm.git`. |
-| `TXRAY_ALLOW_FILE_URLS` | Whitespace-separated `file://` repository URLs that may also be used (local mirrors, tests). Any other scheme here is rejected. |
-
-Exit codes: `0` success; `1` the operation failed (not found, refused, integrity mismatch,
-line range past end of file, git failure); `2` invalid arguments; `3` network access refused
-by the allowlist.
-
-## Documentation
-
-| Topic | Document |
-| --- | --- |
-| Installing, options, uninstall, troubleshooting | [docs/install.md](docs/install.md) |
-| Design and data flow | [docs/architecture.md](docs/architecture.md) |
-| Code index | [docs/code-index.md](docs/code-index.md) |
-| MCP server, tools and client matrix | [docs/mcp.md](docs/mcp.md), [docs/agents/](docs/agents/) |
-| Findings ledger, re-anchoring, review | [docs/findings-memory.md](docs/findings-memory.md) |
-| Diffs, digests and `txray update` | [docs/updates.md](docs/updates.md) |
-| Reviewed upstream changes, 2026-10-15 | [docs/research/upstream-2026-10-15.md](docs/research/upstream-2026-10-15.md) |
-| Reviewed upstream changes, 2026-11-21 | [docs/research/upstream-2026-11-21.md](docs/research/upstream-2026-11-21.md) |
-| Offline metrics from your own export | [docs/analytics.md](docs/analytics.md) |
-| Optional Context Layer export | [docs/context-layer.md](docs/context-layer.md) |
-| Known limits | [docs/limits.md](docs/limits.md) |
-| Release checks and the semantic gate | [docs/release-checklist.md](docs/release-checklist.md) |
+Alpha. The latest release is `v0.11.0` (2026-10-07); `main` adds two reviewed upstream
+snapshots (2026-10-15 and 2026-11-21), classifier v5 and tighter MCP tool descriptions,
+listed under "Unreleased" in the [CHANGELOG](CHANGELOG.md). The next version is tagged only
+after a new live run of the semantic gate. Interfaces may change before 1.0.
 
 ## Contributing
 
@@ -325,16 +231,11 @@ make lint   # byte-compile src, tests and scripts; check the CI workflow
 make ci     # exactly what CI runs: lint, hygiene, strict tests, build + clean-venv install
 ```
 
-Tests that need the real upstream use a local clone through a `file://` URL: set
-`TXRAY_TEST_UPSTREAM` to a clone containing `ed78e06` and its full history, including the
-historical `77d431a` and `92f0918` pins (`python scripts/fetch_test_upstream.py DIR` makes one), or place
-one at `../x-algorithm-upstream`. Without it those tests are
-skipped; with it, `make ci` fails if any test is skipped. The build step of `make ci`
-downloads `setuptools>=77` from PyPI into an isolated virtual environment; the tool itself
-never uses the network except its guarded fetch.
-
+Tests that need the real upstream read a local clone through a `file://` URL:
+`python scripts/fetch_test_upstream.py DIR` makes one, and `TXRAY_TEST_UPSTREAM=DIR` points
+the suite at it; without it those tests are skipped, and with it `make ci` fails on any skip.
 Start with [CONTRIBUTING.md](CONTRIBUTING.md). Contributor and agent rules, including the
-evidence contract, are in [AGENTS.md](AGENTS.md) (identical to `CLAUDE.md`). Security
+evidence contract, are in [AGENTS.md](AGENTS.md) (identical to `CLAUDE.md`); security
 reporting and the threat model are in [SECURITY.md](SECURITY.md).
 
 ## Citing
@@ -346,4 +247,6 @@ with the tool version. GitHub's "Cite this repository" button reads [CITATION.cf
 
 Apache License 2.0 for this project's original code; see [LICENSE](LICENSE) and
 [NOTICE](NOTICE). Upstream source is fetched at runtime and remains under its own terms;
-the manifest's license inventory records the license and notice files it contains.
+the manifest's license inventory records the license and notice files it contains. The
+figures in `docs/img/` are this project's own diagrams, generated from
+[`docs/img/src/make_figures.py`](docs/img/src/make_figures.py); they use no X or xAI logos.
