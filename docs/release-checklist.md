@@ -370,7 +370,9 @@ unsupported numeric answers" is the abstention-accuracy row.
       Apache-2.0, the non-affiliation sentence, runtime fetching without vendoring and the
       absence of X logos; `pyproject.toml` declares `Apache-2.0` with both license files.
 - [x] No image assets in the repository; goldens are citations only (anchors <= 80
-      characters).
+      characters). (Since then: the project's own SVG diagrams in `docs/img/`, generated
+      from `docs/img/src/make_figures.py` and checked by `tests/test_licensing.py`; still no
+      logos and no other images.)
 - [x] `docs/limits.md` lists every known limit; `SECURITY.md` states the threat model.
 - [x] README (status "public alpha", measured gate results), CHANGELOG, `AGENTS.md` = `CLAUDE.md` and
       `docs/architecture.md` describe 0.9.0.

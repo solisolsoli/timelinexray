@@ -6,6 +6,9 @@ scope, not a bug report; where a limit is enforced, the test that enforces it is
 
 ## What the evidence can and cannot say
 
+The reasoning behind these limits is in [evidence-model.md](evidence-model.md) and
+[evaluation.md](evaluation.md#what-has-not-been-measured).
+
 - **Public defaults are not production values.** The upstream README (at `77d431a`) says
   tunable values are read from a configuration system that is synced periodically and that
   experiments run on a share of traffic. Every number TimelineXray shows is a *public
