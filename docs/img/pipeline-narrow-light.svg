@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="380" height="1008" viewBox="0 0 380 1008" role="img" aria-labelledby="t d">
+<title id="t">How TimelineXray is built</title>
+<desc id="d">Four tiers in one column. Source: the public upstream repository and a local snapshot store of pinned commits. Evidence: manifest, exact spans, code index with parameters. Knowledge: findings ledger, diffs and digests. Access: the txray command line and a read-only MCP server.</desc>
+<defs><marker id="head-line" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#818b98"/></marker><marker id="head-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0969da"/></marker><marker id="head-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1a7f37"/></marker><marker id="head-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9a6700"/></marker><marker id="head-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#cf222e"/></marker><marker id="head-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#59636e"/></marker></defs>
+<text x="10" y="26" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#59636e" text-anchor="start">SOURCE</text>
+<rect x="20" y="36" width="340" height="76" rx="10" fill="#f6f8fa" stroke="#d1d9e0" stroke-width="1.5"/>
+<text x="36" y="69" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">xai-org/x-algorithm</text>
+<text x="36" y="95" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636e" text-anchor="start">public repository; read as data, never run</text>
+<rect x="20" y="122" width="340" height="76" rx="10" fill="#f6f8fa" stroke="#d1d9e0" stroke-width="1.5"/>
+<text x="36" y="155" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">Snapshot store</text>
+<text x="36" y="181" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636e" text-anchor="start">bare mirror + one pin per commit id</text>
+<polyline points="190,200 190,242" fill="none" stroke="#818b98" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-line)"/>
+<text x="10" y="264" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#59636e" text-anchor="start">EVIDENCE</text>
+<rect x="20" y="274" width="340" height="76" rx="10" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+<text x="36" y="307" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">Manifest</text>
+<text x="36" y="333" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636e" text-anchor="start">every path classified and hashed</text>
+<rect x="20" y="360" width="340" height="76" rx="10" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+<text x="36" y="393" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">Exact spans</text>
+<text x="36" y="419" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636e" text-anchor="start">blob bytes, SHA-256 and anchor</text>
+<rect x="20" y="446" width="340" height="76" rx="10" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+<text x="36" y="479" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">Code index + parameters</text>
+<text x="36" y="505" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636e" text-anchor="start">search, symbols, public defaults</text>
+<polyline points="190,524 190,566" fill="none" stroke="#818b98" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-line)"/>
+<text x="10" y="588" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#59636e" text-anchor="start">KNOWLEDGE</text>
+<rect x="20" y="598" width="340" height="76" rx="10" fill="#dafbe1" stroke="#1a7f37" stroke-width="1.5"/>
+<text x="36" y="631" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">Findings ledger</text>
+<text x="36" y="657" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636e" text-anchor="start">hash-chained claims; CURRENT / STALE</text>
+<rect x="20" y="684" width="340" height="76" rx="10" fill="#fff8c5" stroke="#9a6700" stroke-width="1.5"/>
+<text x="36" y="717" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">Diffs and digests</text>
+<text x="36" y="743" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636e" text-anchor="start">classified changes, cited both sides</text>
+<polyline points="190,762 190,804" fill="none" stroke="#818b98" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-line)"/>
+<text x="10" y="826" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#59636e" text-anchor="start">ACCESS</text>
+<rect x="20" y="836" width="340" height="76" rx="10" fill="#f6f8fa" stroke="#d1d9e0" stroke-width="1.5"/>
+<text x="36" y="869" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">txray command line</text>
+<text x="36" y="895" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636e" text-anchor="start">every operation; JSON with --json</text>
+<rect x="20" y="922" width="340" height="76" rx="10" fill="#f6f8fa" stroke="#d1d9e0" stroke-width="1.5"/>
+<text x="36" y="955" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">Read-only MCP server</text>
+<text x="36" y="981" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636e" text-anchor="start">13 tools for AI agents; never writes</text>
+</svg>

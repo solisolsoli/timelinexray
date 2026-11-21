@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="470" viewBox="0 0 1000 470" role="img" aria-labelledby="t d">
+<title id="t">Re-anchoring one cited span on a newer commit</title>
+<desc id="d">Decision tree for one citation. If the file has the same blob, the outcome is identical. If the path still exists, the exact span bytes are searched in that file: found once means unchanged or relocated (CURRENT), several times means ambiguous (UNVERIFIABLE), not at all means changed (STALE, with a line-diff proposal). If the path is gone, other files are searched by identical blob, then through the code index: one match is relocated, none is missing (UNVERIFIABLE). The finding takes the worst outcome of its parts.</desc>
+<defs><marker id="head-line" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#818b98"/></marker><marker id="head-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0969da"/></marker><marker id="head-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1a7f37"/></marker><marker id="head-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9a6700"/></marker><marker id="head-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#cf222e"/></marker><marker id="head-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#59636e"/></marker></defs>
+<rect x="330" y="10" width="340" height="44" rx="22" fill="#f6f8fa" stroke="#d1d9e0" stroke-width="1.5"/>
+<text x="500" y="38" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">cited span, read at its own commit</text>
+<rect x="330" y="100" width="340" height="44" rx="22" fill="#f6f8fa" stroke="#d1d9e0" stroke-width="1.5"/>
+<text x="500" y="128" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">same path, same blob at the target?</text>
+<polyline points="500,56 500,96" fill="none" stroke="#818b98" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-line)"/>
+<rect x="760" y="84" width="230" height="76" rx="10" fill="#dafbe1" stroke="#1a7f37" stroke-width="1.5"/>
+<text x="776" y="117" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#1f2328" text-anchor="start">identical</text>
+<text x="776" y="141" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">CURRENT</text>
+<polyline points="672,122 756,122" fill="none" stroke="#1a7f37" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-ok)"/>
+<text x="714" y="114" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="middle">yes</text>
+<rect x="330" y="200" width="340" height="44" rx="22" fill="#f6f8fa" stroke="#d1d9e0" stroke-width="1.5"/>
+<text x="500" y="228" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">does the path still exist?</text>
+<polyline points="500,146 500,196" fill="none" stroke="#818b98" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-line)"/>
+<text x="512" y="178" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">no</text>
+<rect x="10" y="290" width="470" height="44" rx="22" fill="#f6f8fa" stroke="#d1d9e0" stroke-width="1.5"/>
+<text x="245" y="318" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">exact span bytes in that file (whole lines)</text>
+<polyline points="400,246 400,266 245,266 245,286" fill="none" stroke="#818b98" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-line)"/>
+<text x="300" y="262" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">yes</text>
+<rect x="10" y="370" width="150" height="92" rx="10" fill="#dafbe1" stroke="#1a7f37" stroke-width="1.5"/>
+<text x="26" y="403" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">once</text>
+<text x="26" y="427" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">unchanged or</text>
+<text x="26" y="445" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">relocated</text>
+<rect x="170" y="370" width="150" height="92" rx="10" fill="#ffebe9" stroke="#cf222e" stroke-width="1.5"/>
+<text x="186" y="403" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">several</text>
+<text x="186" y="427" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">ambiguous:</text>
+<text x="186" y="445" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">none is picked</text>
+<rect x="330" y="370" width="150" height="92" rx="10" fill="#fff8c5" stroke="#9a6700" stroke-width="1.5"/>
+<text x="346" y="403" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">none</text>
+<text x="346" y="427" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">changed: STALE</text>
+<text x="346" y="445" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">+ line-diff idea</text>
+<polyline points="245,336 245,352 85,352 85,366" fill="none" stroke="#818b98" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-line)"/>
+<polyline points="245,336 245,352 245,352 245,366" fill="none" stroke="#818b98" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-line)"/>
+<polyline points="245,336 245,352 405,352 405,366" fill="none" stroke="#818b98" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-line)"/>
+<rect x="520" y="290" width="470" height="44" rx="22" fill="#f6f8fa" stroke="#d1d9e0" stroke-width="1.5"/>
+<text x="755" y="318" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#1f2328" text-anchor="middle">other files: same blob id, then index search</text>
+<polyline points="600,246 600,266 755,266 755,286" fill="none" stroke="#818b98" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-line)"/>
+<text x="612" y="262" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">no</text>
+<rect x="520" y="370" width="150" height="92" rx="10" fill="#dafbe1" stroke="#1a7f37" stroke-width="1.5"/>
+<text x="536" y="403" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">one</text>
+<text x="536" y="427" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">relocated:</text>
+<text x="536" y="445" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">CURRENT</text>
+<rect x="680" y="370" width="150" height="92" rx="10" fill="#ffebe9" stroke="#cf222e" stroke-width="1.5"/>
+<text x="696" y="403" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">several</text>
+<text x="696" y="427" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">ambiguous:</text>
+<text x="696" y="445" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">UNVERIFIABLE</text>
+<rect x="840" y="370" width="150" height="92" rx="10" fill="#ffebe9" stroke="#cf222e" stroke-width="1.5"/>
+<text x="856" y="403" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start">none</text>
+<text x="856" y="427" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">missing:</text>
+<text x="856" y="445" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">UNVERIFIABLE</text>
+<polyline points="755,336 755,352 595,352 595,366" fill="none" stroke="#818b98" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-line)"/>
+<polyline points="755,336 755,352 755,352 755,366" fill="none" stroke="#818b98" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-line)"/>
+<polyline points="755,336 755,352 915,352 915,366" fill="none" stroke="#818b98" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-line)"/>
+<text x="990" y="210" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636e" text-anchor="end">A finding takes the worst of its parts:</text>
+<text x="990" y="230" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636e" text-anchor="end">STALE, then UNVERIFIABLE, then CURRENT.</text>
+<text x="10" y="210" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636e" text-anchor="start">Not usable at its own commit:</text>
+<text x="10" y="230" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#59636e" text-anchor="start">unusable, UNVERIFIABLE.</text>
+</svg>

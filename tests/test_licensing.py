@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import re
 import tomllib
 import unittest
 
@@ -12,6 +14,7 @@ DISCLAIMER = (
     "Independent community analysis of publicly available source code. "
     "Not affiliated with or endorsed by X or xAI."
 )
+FIGURES = REPO_ROOT / "docs" / "img"
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".bmp", ".tif",
                   ".tiff", ".pdf", ".ai", ".eps"}
 
@@ -41,9 +44,32 @@ class NoticeTest(unittest.TestCase):
         self.assertIn("Apache License 2.0", (REPO_ROOT / "README.md").read_text("utf-8"))
 
     def test_no_logos_or_other_image_assets(self) -> None:
-        images = [str(path.relative_to(REPO_ROOT)) for path in _tracked_like_files()
-                  if path.suffix.lower() in IMAGE_SUFFIXES]
-        self.assertEqual(images, [])
+        """The only images are the project's own SVG diagrams in docs/img/ (no logos)."""
+        images = [path for path in _tracked_like_files() if path.suffix.lower() in IMAGE_SUFFIXES]
+        others = [str(path.relative_to(REPO_ROOT)) for path in images
+                  if path.parent != FIGURES or path.suffix != ".svg"]
+        self.assertEqual(others, [])
+
+    def test_figures_are_generated_text_only_diagrams(self) -> None:
+        """Every figure is exactly what docs/img/src/make_figures.py writes, and is plain SVG:
+        no script, embedded image, foreign object, link or external reference."""
+        spec = importlib.util.spec_from_file_location("make_figures",
+                                                      FIGURES / "src" / "make_figures.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        expected = module.render_all()
+        committed = {path.name: path.read_text("utf-8") for path in FIGURES.glob("*.svg")}
+        self.assertEqual(sorted(committed), sorted(expected))
+        for name, data in expected.items():
+            with self.subTest(figure=name):
+                self.assertEqual(committed[name], data)
+                lowered = data.lower()
+                for forbidden in ("<script", "<image", "<foreignobject", "href", "<style",
+                                  "@import", "logo"):
+                    self.assertNotIn(forbidden, lowered)
+                self.assertEqual(re.findall(r"https?://[^\"' ]+", data),
+                                 ["http://www.w3.org/2000/svg"])
+                self.assertIn("<title", data)
 
     def test_goldens_hold_citations_not_source(self) -> None:
         data = json.loads((REPO_ROOT / "goldens" / "citations.json").read_text("utf-8"))
