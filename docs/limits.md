@@ -116,6 +116,9 @@ scope, not a bug report; where a limit is enforced, the test that enforces it is
   `visibility-rule`, `access-modifier`) cover a whole hunk or nothing. About 31 % of the items
   of `77d431a..78460ca` stay `unknown` (classifier v4); whole added files of production code
   almost always do.
+- A YAML list item is paired across commits by its `id` or `name` value (classifier v5); an
+  item without one is still paired by position, so inserting such an item can report later
+  items' values as changed defaults.
 - The main Markdown digest is bounded by row budgets; on a large range it names what it cut
   and the appendix holds the rest. The appendix and the JSON document are not bounded
   (the appendix of `aaa167b..77d431a` is about 1.1 MB).

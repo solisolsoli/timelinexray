@@ -64,7 +64,8 @@ link at a digest's name is replaced, never followed.
 ## Classes
 
 A class names what the rule saw; it is not a reviewed interpretation. One file can yield
-items of several classes. Rules, in order (classifier version 4; version 3 let every
+items of several classes. Rules, in order (classifier version 5; version 4 named the
+items of a YAML list by position, version 3 let every
 scoring name win over kernel and training locations, metrics and debug names and the
 content classes, version 2 had no content
 rules, matched scoring names as substrings and read neighbouring and test symbols, version 1
@@ -80,7 +81,7 @@ carried no reason):
 | `docs-only` | documentation files (`.md`, `.rst`, `.txt`, `docs/`, `README*`, ...) | a change of behaviour |
 | `test-only` | test files (`tests/`, `golden_corpus/`, `*_test.rs`, `test_*.py`, `*Test.java`, `test_support.*`, `test_helpers.*`, `*_fixtures.*`, ...), or hunks whose code lines all lie inside test code (Rust `#[cfg(test)]` modules and items and `#[test]` functions, Java `@Test` methods, Python `test_*`/`Test*`) | a change of production code |
 | `build-dependency` | a build-system or dependency file by name (`BUILD`, `*.bazel`, `*.bzl`, `WORKSPACE`, `Cargo.toml`, `build.rs`, `pyproject.toml`, `setup.py`, `requirements*.txt`, `package.json`, `Makefile`, `CMakeLists.txt`, `Dockerfile`, `pom.xml`, `build.gradle`, `build.sbt`, `go.mod`, ...), or a hunk whose every changed code line lies in a Milestone 2 `import` symbol (Rust `use`/`extern crate`, Java, Scala and Python imports) or a bodyless `module` symbol (`mod name;`, a `package` clause); blank and comment-only lines may accompany them; an added or removed empty `__init__.py` (a package marker) and `py.typed` | that behaviour is unchanged: an import can change name resolution and a dependency version can change behaviour |
-| `parameter-default` | the value of a `param!(Name, type, "flag", value)` declaration, a `const`/`static` or Java `static final` with a literal value, a literal Java/Scala field, a Python `UPPER_CASE` constant with a literal value, or a key of a YAML/TOML/INI/JSON config file differs between the two cited declarations; `param!` declarations added or removed | a production value: every value is a **public default** at its commit |
+| `parameter-default` | the value of a `param!(Name, type, "flag", value)` declaration, a `const`/`static` or Java `static final` with a literal value, a literal Java/Scala field, a Python `UPPER_CASE` constant with a literal value, or a key of a YAML/TOML/INI/JSON config file differs between the two cited declarations (a YAML list item whose first key is `id` or `name` is named by that value, `rules[id=x].when`, not by its position); `param!` declarations added or removed | a production value: every value is a **public default** at its commit |
 | `registration` | entries of a list that registers components were added, removed or reordered, or such a list appeared or disappeared: a `vec![...]`, `Seq(...)`, `List.of(...)` or Python list whose entries name components (`...Filter`, `...Source`, `...Hydrator`, `...Scorer`, `...SideEffect`, `...Rule`, ...) or that is bound to a name like `filters`, `sources`, `side_effects`, `rules` | that a registered component is active for any request |
 | `cosmetic` | the comment- and whitespace-insensitive tokens of both sides are equal (string literals kept whole; indentation kept for Python and YAML), or a file moved with identical content | semantic equivalence where parser coverage is incomplete |
 | `access-modifier` | a hunk with changed lines on both sides whose tokens are equal once access modifiers are removed (Rust `pub`, `pub(crate)`, `pub(super)`, `pub(in path)`; Java `public`, `private`, `protected`; Scala `private`/`protected` with an optional `[scope]`); decided before the name rules, since no other token changed | that behaviour is unchanged: a newly visible item can be used from other modules |
@@ -200,6 +201,23 @@ now excluded; of the 22 sampled items that stay `data-type`, 22 are correct. Mea
 `scoring-logic`). On `aaa167b..77d431a`, where most unknown items are whole added files that
 no line rule can take, `unknown` is 1,381 -> 1,422 (49 hunks back from `scoring-logic`, 17
 to `data-type` and `observability`).
+
+Version 5 changes one thing: the items of a YAML list. Version 4 named a key inside a list
+item by its path alone (`rules.when`) and paired the n-th occurrence on each side, so removing
+or inserting one item paired every later item with its predecessor and reported their values
+as changed public defaults. On `92f0918..ed78e06` all 76 `parameter-default` items of the two
+abuse-enforcement rule files were such pairings (read item by item; for example
+`rules.id: very_high_follower_count -> high_follower_count` and `rules.when:
+cred.follower_count >= 12345.67 -> cred.follower_count >= 12.34`, two different rules). An
+item whose first key is `id` or `name` with a plain scalar value is now named by it
+(`rules[id=act_add_llm_slop_label].then.ttl_msec`), and the identity line itself is not a
+value; an item without such a key keeps the version 4 name and ordinal. On those two files
+version 5 reports one item, the real change of that rule's `ttl_msec` (2592000000 ->
+604800000), tested on the upstream blobs. Over the whole history (`aaa167b..ed78e06`, 73
+first-parent steps) version 4 produced 257 such items in four steps, every one pairing two
+list items with different `id` values (checked mechanically: the nearest `- id:` line differs
+on the two sides); version 5 keeps that one real change. No other class and no other file
+changes: the net digests of `77d431a..78460ca` and `78460ca..92f0918` are as before.
 
 Values are compared as their source text with comments removed and whitespace collapsed.
 A constant computed by code (for example `Duration::from_secs(compute())`) is logic, not a
@@ -439,6 +457,8 @@ reported, not promised.
 | `aaa167b..77d431a`, classifier v4 (scoring precedence) | 2,698 net items: scoring-logic 137, model-config 527, unknown 1,385; main digest 38,658 bytes (v3 in the same store: 38,543) |
 | `77d431a..78460ca`, classifier v4 (final) | 1,236 net items: parameter-default 25, registration 7, scoring-logic 45, visibility-rule 32, model-config 183, docs-only 1, test-only 254, build-dependency 125, data-type 38, observability 6, access-modifier 11, cosmetic 124, generated-vendored 1, unknown 384 (no-rule 381, not-parsed 3). Main digest 31,820 bytes, appendix 435,783, JSON 2,269,940 |
 | `aaa167b..77d431a`, classifier v4 (final) | 2,698 net items: scoring-logic 137, model-config 527, build-dependency 209, test-only 83, unknown 1,352 (no-rule 1,241, not-parsed 110, not-text 1); main digest 38,577 bytes, appendix 1,066,008 |
+| `92f0918..ed78e06` (26 steps, 660 files), classifier v4 -> v5 | 3,942 -> 3,867 net items: parameter-default 215 -> 140 (the 76 v4 items of the two abuse-enforcement rule files -> 1), every other class identical (registration 15, scoring-logic 169, model-config 668, test-only 700, build-dependency 315, data-type 139, unknown 1,639); about 4 min |
+| `aaa167b..ed78e06` (74 commits, 73 steps), classifier v4 -> v5 | 3,118 net items under both (parameter-default 338: the rule files are new files in the net diff); parameter-default items summed over the steps 923 -> 667, the difference is the rule files (257 -> 1); about 4 min per run |
 | `4c5cfe8..a707cc2` (1 step, 89 files) | 381 items: parameter-default 8, registration 1, scoring-logic 16, model-config 43, docs-only 1, test-only 121, cosmetic 1, unknown 190. `ClickWeight` public default 0.4 -> 0.3 in `home-mixer/params/param.rs` (L322 -> L329) and `vm-ranker/params.rs` (L18 -> L18), with `ContClickDwellTimeWeight` 0.0 -> 0.4 and `NotInterestedWeight` -43.2 -> -47.52 in both files; about 2 s |
 | `aaa167b..77d431a` (39 commits, 37 first-parent steps, one merge) | 2,164 files (2,090 added), 2,684 net items: parameter-default 210, registration 54, scoring-logic 243, model-config 466, license 4, docs-only 9, test-only 78, cosmetic 92, generated-vendored 6, unknown 1,522; timelines reproduce, for example, `ClickWeight` 0.4 at 47c1bcd -> 0.3 at a707cc2 and the reversion of `EnableAdsBrandSafetyVerdictV2` (false -> true -> false); about 30 s without an index; byte-identical across runs |
 | `4c5cfe8..a707cc2` with a ledger of 478 active findings (588 cited or dependency spans, no index) | affected findings: 48 findings (83 rows); 286 spans skipped (path untouched at both commits), 268 placed, 34 not placeable; about 1.9 s against 1.7 s without a ledger (7.7 s before the spans were indexed by path, the proposals skipped and the blobs read in one git process per commit); the affected rows are byte-identical to the unfiltered run |

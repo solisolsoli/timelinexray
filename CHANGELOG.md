@@ -28,6 +28,14 @@ All notable changes to this project are recorded here. Versions follow PEP 440.
 
 ### Changed
 
+- **Classifier v5: YAML list items are keyed by identity** (`timelinexray/diff/analysis.py`).
+  A sequence item whose first key is `id` or `name` with a plain scalar value is named by it
+  (`rules[id=x].when`) instead of by its position, so removing or inserting a rule no longer
+  pairs every later rule with its predecessor. On the upstream abuse-enforcement rule files
+  of `92f0918..ed78e06` all 76 v4 `parameter-default` items were such pairings (for example
+  `rules.id: very_high_follower_count -> high_follower_count`); v5 reports one, the real
+  `ttl_msec` change of the `act_add_llm_slop_label` rule. Item ids change with the
+  classifier version.
 - **Classifier v4: precise classes win over the scoring name** (`timelinexray/diff/rules.py`,
   `engine.py`). Kernel and offline training code (`cuda`, `cutedsl`, `pallas`, `triton`,
   `kernels`, `train`, `training`, `optimizers` directories; `.cu`/`.cuh` files) is

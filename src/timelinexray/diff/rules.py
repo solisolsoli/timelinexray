@@ -14,7 +14,7 @@ import re
 
 from ..snapshot.classify import license_kind
 
-CLASSIFIER_VERSION = 4
+CLASSIFIER_VERSION = 5
 
 PARAMETER_DEFAULT = "parameter-default"
 REGISTRATION = "registration"

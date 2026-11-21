@@ -131,6 +131,12 @@ _YAML_KEY = re.compile(r"^(\s*)(?:-\s+)?(['\"]?)([A-Za-z0-9_.\-/]+)\2\s*:(?:\s+(
 _INI_SECTION = re.compile(r"^\s*\[\[?([^\]]+)\]\]?\s*$")
 _INI_KEY = re.compile(r"^(\s*)(['\"]?)([A-Za-z0-9_.\-/]+)\2\s*[=:]\s*(.*?)\s*$")
 _JSON_KEY = re.compile(r"^(\s*)\"([^\"\\]+)\"\s*:\s*(.*?)\s*,?\s*$")
+# A YAML sequence item whose first key is one of these names is keyed by that value
+# (``rules[id=x].when``), not by its position: inserting or removing an item must not
+# pair every later item with its predecessor and report their values as changed defaults.
+_YAML_ITEM = re.compile(r"^\s*-\s+")
+_YAML_ITEM_IDENTITY = ("id", "name")
+_YAML_SCALAR = re.compile(r"^(['\"]?)([^'\"{}\[\],&*!|>#]+)\1$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -526,11 +532,18 @@ class BlobAnalysis:
             value = _strip_config_comment(value or "")
             while stack and stack[-1][0] >= indent:
                 stack.pop()
+            if (self.language == "yaml" and key in _YAML_ITEM_IDENTITY
+                    and _YAML_ITEM.match(line)):
+                identity = _YAML_SCALAR.match(value)
+                if identity:
+                    # the item's keys lie deeper than its dash; the next item pops this
+                    stack.append((indent, f"[{key}={identity.group(2).strip()}]"))
+                    continue
             if not value or value in ("{", "[", "|", ">", "|-", ">-"):
                 stack.append((indent, key))
                 continue
             parts = ([section] if section else []) + [name for _, name in stack] + [key]
-            name = ".".join(parts)
+            name = ".".join(parts).replace(".[", "[")
             ordinal = seen[name]
             seen[name] += 1
             found.append(ValueDecl(CONFIG_KEY, name, ordinal, number, number,

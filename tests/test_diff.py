@@ -265,6 +265,22 @@ class StepFixtureTest(unittest.TestCase):
         [item] = self._diff(old, new).items
         self.assertEqual(item.change_class, "unknown")
 
+    def test_inserted_yaml_rule_does_not_shift_later_rules(self) -> None:
+        # Shape of the upstream enforcement rule files, synthetic values: one rule removed,
+        # one rule's threshold changed. Classifier v4 paired rules by position and reported
+        # every later `rules.id`/`rules.when` as a changed public default.
+        def rules(*items: tuple[str, str]) -> bytes:
+            return b"for_entity: user\nrules:\n" + b"".join(
+                f"  - id: {rid}\n    when: {when}\n    then:\n      kind: skip\n"
+                f"      reason: {rid}\n\n".encode() for rid, when in items)
+        old = {"svc/rules/r.yaml": rules(("a", "x.ok"), ("b", "n >= 100.0"), ("c", "n >= 1.5"),
+                                         ("d", "y.ok"))}
+        new = {"svc/rules/r.yaml": rules(("a", "x.ok"), ("c", "n >= 2.5"), ("d", "y.ok"))}
+        values = [item for item in self._diff(old, new).items
+                  if item.change_class == "parameter-default"]
+        self.assertEqual([(i.detail["name"], i.detail["old_value"], i.detail["new_value"])
+                          for i in values], [("rules[id=c].when", "n >= 1.5", "n >= 2.5")])
+
     def test_empty_and_identical_commits(self) -> None:
         same = {"x.rs": b"fn x() {}\n"}
         self.assertEqual(self._diff(same, dict(same)).items, ())
@@ -322,6 +338,29 @@ class ValueParserTest(unittest.TestCase):
         self.assertEqual(self._values("Cargo.toml", "toml", b"[package]\nversion = \"1\"\n"), {})
         json_values = self._values("conf/a.json", "json", b'{\n  "a": {\n    "b": 2,\n    "c": true\n  }\n}\n')
         self.assertEqual(json_values, {"a.b": ("config-key", "2"), "a.c": ("config-key", "true")})
+
+    def test_yaml_sequence_items_are_keyed_by_their_identity(self) -> None:
+        # Classifier v5: an item whose first key is `id` or `name` is named by that value, so
+        # inserting or removing an item cannot pair later items with their predecessors.
+        text = (b"rules:\n  - id: allow\n    when: a.ok\n    then:\n      kind: skip\n\n"
+                b"  # a comment\n  - id: \"high\"\n    when: x >= 1.5\n"
+                b"    then: { kind: act, perm: false }\n"
+                b"  - kind: plain\n    when: z\n"
+                b"other:\n  - name: n1\n    value: 3\n")
+        self.assertEqual(self._values("rules/r.yaml", "yaml", text), {
+            "rules[id=allow].when": ("config-key", "a.ok"),
+            "rules[id=allow].then.kind": ("config-key", "skip"),
+            "rules[id=high].when": ("config-key", "x >= 1.5"),
+            "rules[id=high].then": ("config-key", "{ kind: act, perm: false }"),
+            "rules.kind": ("config-key", "plain"),
+            "rules.when": ("config-key", "z"),
+            "other[name=n1].value": ("config-key", "3"),
+        })
+        # not a sequence item, or not a plain scalar identity: the v4 names stay
+        self.assertEqual(self._values("r.yaml", "yaml", b"a:\n  id: 7\n  b: 1\n"),
+                         {"a.id": ("config-key", "7"), "a.b": ("config-key", "1")})
+        self.assertEqual(self._values("r.yaml", "yaml", b"l:\n  - id: [1, 2]\n    b: 1\n"),
+                         {"l.id": ("config-key", "[1, 2]"), "l.b": ("config-key", "1")})
 
 
 class ClassifierV2Test(unittest.TestCase):
