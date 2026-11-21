@@ -311,6 +311,7 @@ by the allowlist.
 | Findings ledger, re-anchoring, review | [docs/findings-memory.md](docs/findings-memory.md) |
 | Diffs, digests and `txray update` | [docs/updates.md](docs/updates.md) |
 | Reviewed upstream changes, 2026-10-15 | [docs/research/upstream-2026-10-15.md](docs/research/upstream-2026-10-15.md) |
+| Reviewed upstream changes, 2026-11-21 | [docs/research/upstream-2026-11-21.md](docs/research/upstream-2026-11-21.md) |
 | Offline metrics from your own export | [docs/analytics.md](docs/analytics.md) |
 | Optional Context Layer export | [docs/context-layer.md](docs/context-layer.md) |
 | Known limits | [docs/limits.md](docs/limits.md) |
@@ -325,8 +326,8 @@ make ci     # exactly what CI runs: lint, hygiene, strict tests, build + clean-v
 ```
 
 Tests that need the real upstream use a local clone through a `file://` URL: set
-`TXRAY_TEST_UPSTREAM` to a clone containing `92f0918` and its full history, including the
-historical `77d431a` pin (`python scripts/fetch_test_upstream.py DIR` makes one), or place
+`TXRAY_TEST_UPSTREAM` to a clone containing `ed78e06` and its full history, including the
+historical `77d431a` and `92f0918` pins (`python scripts/fetch_test_upstream.py DIR` makes one), or place
 one at `../x-algorithm-upstream`. Without it those tests are
 skipped; with it, `make ci` fails if any test is skipped. The build step of `make ci`
 downloads `setuptools>=77` from PyPI into an isolated virtual environment; the tool itself

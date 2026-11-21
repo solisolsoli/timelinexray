@@ -115,7 +115,8 @@ scope, not a bug report; where a limit is enforced, the test that enforces it is
   unless another rule applies. Content rules (`observability`, `data-type`,
   `visibility-rule`, `access-modifier`) cover a whole hunk or nothing. About 31 % of the items
   of `77d431a..78460ca` stay `unknown` (classifier v4); whole added files of production code
-  almost always do.
+  almost always do. On `92f0918..ed78e06` a seeded sample of 20 `scoring-logic` items was
+  4 scoring code and 7 adjacent (classifier v4 rules; [research/upstream-2026-11-21.md](research/upstream-2026-11-21.md)).
 - A YAML list item is paired across commits by its `id` or `name` value (classifier v5); an
   item without one is still paired by position, so inserting such an item can report later
   items' values as changed defaults.

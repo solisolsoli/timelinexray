@@ -6,6 +6,22 @@ All notable changes to this project are recorded here. Versions follow PEP 440.
 
 ### Added
 
+- A source-reviewed upstream report for `92f0918..ed78e06` (2026-11-21, 26 commits): seven
+  Home Mixer value-model weight defaults changed while the VM Ranker copies did not; a
+  second (multiplicative) fusion mode behind `ValueModelMode` (public default `weighted`);
+  `post_video` and `grok_analyze` heads added and `react_with_video` removed; per-class
+  OON/in-network factors that the public defaults leave unset; `Brazil2026ElectionFilter`
+  no longer registered; two rerank scorers off by default; DPP greedy order and sliding
+  window; ad blender, new-user engagement, carousel and enforcement-rule defaults. Every
+  link was re-read with `txray show`; all 17 changed Home Mixer defaults are cited on both
+  sides. Public defaults only; no production or deployment claims. The report also records
+  the re-review of the 223 research-ledger findings the range made stale (117 re-verified,
+  78 revised, 16 historical, 12 left STALE and listed, 5 new; none approved).
+- Additive citation goldens (38) and acceptance coverage for `ed78e06`, including the
+  separate Home Mixer and VM Ranker declarations, new indexed paths, the absent
+  `ReactWithVideoWeight` and the rule-file pairing below. The developer/CI fetch helper now
+  supplies `ed78e06` with its 75-commit history. The runtime setup pin, historical golden
+  sets and semantic gate sets remain unchanged.
 - A source-reviewed upstream report for `78460ca..92f0918` (2026-10-15), with pinned
   citations for changed defaults, new scoring/model inputs, gated video paths and visibility
   rule changes. Home Mixer and VM Ranker defaults are kept separate; no production or
